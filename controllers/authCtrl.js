@@ -38,7 +38,7 @@ const register = async (req, res) => {
         const origin = process.env.ORIGIN;
 
         await sendVerificationEmail({
-            name: user.firstname,
+            name: user.fullname,
             email: user.email,
             verificationToken: user.verificationToken,
             origin,
