@@ -4,7 +4,7 @@ const sendVerificationEmail = require('../utils/sendVerificationEmail')
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 
-const register = async (req, res) => {
+const registerUser = async (req, res) => {
     const { fullname, email, password, phone_number, address } = req.body;
 
     // Input validation
@@ -49,7 +49,7 @@ const register = async (req, res) => {
     }
 }
 
-const login = async (req, res) => {
+const loginUser = async (req, res) => {
     const { email, password } = req.body;
 
     // Validate input
@@ -97,12 +97,12 @@ const login = async (req, res) => {
     }
 }
 
-const logout = async (req, res) => {
+const logoutUser = async (req, res) => {
     // clear the token on the client-side
     res.status(200).json({ message: 'Logout successful. Please remove the token on the client-side.' })
 }
 
-const verifyEmail = async (req, res) => {
+const verifyUserEmail = async (req, res) => {
     try {
         const { verificationToken, email } = req.body;
         const user = await User.findOne({ email });
@@ -142,11 +142,10 @@ const updateUserPassword = async (req, res) => {
 };
 
 
-
 module.exports = {
-    register,
-    login,
-    logout,
-    verifyEmail,
+    registerUser,
+    loginUser,
+    logoutUser,
+    verifyUserEmail,
     updateUserPassword,
 };
