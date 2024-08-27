@@ -1,6 +1,7 @@
 const express = require('express');
 const app = express()
 const users = require('./routes/user')
+const booking = require('./routes/bookings')
 const connectDB = require('./db/connect_db')
 require('dotenv').config()
 
@@ -11,6 +12,7 @@ app.use(express.json())
 
 // Routes
 app.use('/api/v1/users', users)
+app.use('/api/v1/book', booking)
 
 const port = process.env.PORT || 5000;
 
