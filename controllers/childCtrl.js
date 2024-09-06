@@ -50,7 +50,6 @@ const getChild = async (req, res) => {
 
 // Get all children a user has (still in works)
 const getChildByUser =  async (req, res) => {
-    console.log(req.user._id , req.user)
     try {
         const children = await Child.find({ user: req.user._id })
         res.status(200).json(children);
