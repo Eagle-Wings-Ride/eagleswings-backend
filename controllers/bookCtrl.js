@@ -48,13 +48,13 @@ const bookRide = async (req, res) => {
 
 // find all rides created by the user
 
-const getRidesByUser = async(req, res) => {
-    const {userId} = req.params
+const getRidesByUser = async (req, res) => {
+    const userId = req.user.userId
 
-    try{
-        const rides = await Book.find({user: userId}).populate('child')
-        res.status(200).json({rides})
-    }catch(err){
+    try {
+        const rides = await Book.find({ user: userId }).populate('child')
+        res.status(200).json({ rides })
+    } catch (err) {
         res.status(500).json({ error: err.message })
     }
 }
@@ -76,9 +76,14 @@ const getRideByChild = async (req, res) => {
     }
 }
 
+const getAllRides = async (req, res) => {
+    const rides = await Book.find({})
+    res.status(200).json({rides})
+}
 
 module.exports = {
     bookRide,
     getRidesByUser,
-    getRideByChild
+    getRideByChild,
+    getAllRides
 }
