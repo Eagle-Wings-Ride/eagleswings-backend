@@ -9,7 +9,7 @@ const {addChild, getChild, getChildByUser, updateChild, deleteChild} = require('
 // User Route
 router.route('/').get(authenticateToken, getAllUsers)
 router.route('/current').get(authenticateToken, currentUser)
-router.route('/:id').get(getUser)
+router.route('/:id').get(authenticateToken, getUser)
                     .patch(authenticateToken, updateUser)
                     .delete(authenticateToken, deleteUser)
 router.route('/register').post(registerUser)
@@ -23,9 +23,6 @@ router.route('/child/:id').get(authenticateToken, getChild)
                         .patch(authenticateToken, updateChild)
                         .delete(authenticateToken, deleteChild)
 router.route('/my-children').get( authenticateToken, getChildByUser)
-
-
-
 
 
 module.exports = router
