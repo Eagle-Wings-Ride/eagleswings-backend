@@ -1,8 +1,10 @@
 const { Model } = require('mongoose')
 const User = require('../models/User')
+const TokenBlacklist = require('../models/tokenBlacklist')
 const sendVerificationEmail = require('../utils/sendVerificationEmail')
-const jwt = require('jsonwebtoken');
-const crypto = require('crypto');
+const jwt = require('jsonwebtoken')
+const otpGenerator = require('otp-generator')
+
 
 const registerUser = async (req, res) => {
     const { fullname, email, password, phone_number, address } = req.body;
@@ -19,15 +21,24 @@ const registerUser = async (req, res) => {
             return res.status(409).json({ message: 'Email already exists' })
         }
 
+        // Generate Otp code
+        const otp = otpGenerator.generate(6, { 
+            alphabets: false,
+            specialChars: false,
+            digits: true
+        });
+        const otpExpiry = new Date();
+        otpExpiry.setMinutes(otpExpiry.getMinutes() + 10);
+        
         // Create a new user
-        const verificationToken = crypto.randomBytes(32).toString('hex')
         const user = new User({
             fullname,
             email,
             password,
             phone_number,
             address,
-            verificationToken,
+            otp,
+            otpExpiry,
             isVerified: false
         });
 
@@ -35,13 +46,10 @@ const registerUser = async (req, res) => {
 
         // Send verification email
 
-        const origin = process.env.ORIGIN;
-
         await sendVerificationEmail({
             name: user.fullname,
             email: user.email,
-            verificationToken: user.verificationToken,
-            origin,
+            otp: user.otp,
         })
         res.status(201).json({ message: 'User registered successfully. Please check your email to verify your account.' });
     } catch (error) {
@@ -98,54 +106,74 @@ const loginUser = async (req, res) => {
 }
 
 const logoutUser = async (req, res) => {
-    // clear the token on the client-side
-    res.status(200).json({ message: 'Logout successful. Please remove the token on the client-side.' })
+    const token = req.headers.authorization?.split(' ')[1]
+    if (!token) {
+        return res.status(401).json({ message: 'No token provided' })
+    }
+
+    try {
+        // Add the token to the blacklist
+        await TokenBlacklist.create({ token })
+
+        // Clear the token on the client-side
+        res.status(200).json({ message: 'Logout successful. Please remove the token on the client-side.' })
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Logout failed', error })
+    }
 }
 
-const verifyUserEmail = async (req, res) => {
+const verifyUserOTP = async (req, res) => {
     try {
-        const { verificationToken, email } = req.body;
-        const user = await User.findOne({ email });
+        const { email, otp } = req.body
 
-        if (!user || user.verificationToken !== verificationToken) {
-            return res.status(400).json({ message: 'Verification Failed' });
+        // Find user by email
+        const user = await User.findOne({ email })
+        if (!user) {
+            return res.status(400).json({ message: 'Invalid email or OTP' })
         }
 
-        user.isVerified = true,
-        user.verificationToken = undefined
+        // Check if OTP matches and is not expired
+        if (user.otp !== otp || user.otpExpiry < new Date()) {
+            return res.status(400).json({ message: 'Invalid or expired OTP' })
+        }
 
-        await user.save();
+        user.isVerified = true
+        user.otp = undefined
+        user.otpExpiry = undefined
 
-        res.status(200).json({ message: 'Email successfully verified' });
+        await user.save()
+
+        res.status(200).json({ message: 'OTP verified successfully' })
     } catch (error) {
-        res.status(500).json({ message: 'Email verification failed', error });
+        res.status(500).json({ message: 'OTP verification failed', error })
     }
 }
 
 const updateUserPassword = async (req, res) => {
-    const { oldPassword, newPassword } = req.body;
+    const { oldPassword, newPassword } = req.body
 
     if (!oldPassword || !newPassword) {
-      return res.status(401).json({message : 'Please provide both values'});
+      return res.status(401).json({message : 'Please provide both values'})
     }
 
-    const user = await User.findOne({ _id: req.user.userId });
+    const user = await User.findOne({ _id: req.user.userId })
 
-    const isPasswordCorrect = await user.comparePassword(oldPassword);
+    const isPasswordCorrect = await user.comparePassword(oldPassword)
     if (!isPasswordCorrect) {
-        return res.status(401).json({ message: 'Invalid Credentials' });
+        return res.status(401).json({ message: 'Invalid Credentials' })
     }
-    user.password = newPassword;
+    user.password = newPassword
   
-    await user.save();
-    res.status(200).json({ msg: 'Success! Password Updated.' });
-};
+    await user.save()
+    res.status(200).json({ msg: 'Success! Password Updated.' })
+}
 
 
 module.exports = {
     registerUser,
     loginUser,
     logoutUser,
-    verifyUserEmail,
+    verifyUserOTP,
     updateUserPassword,
-};
+}

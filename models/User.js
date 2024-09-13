@@ -30,12 +30,13 @@ const UserSchema = new Schema({
     isVerified: {
       type: Boolean,
       default: false
-  },
-    verificationToken: String,
+    },
+    otp: String,
+    otpExpiry: Date,
     createdAt: {
       type: Date,
       default: Date.now() 
-  }
+    }
   });
 
 
@@ -49,6 +50,6 @@ const UserSchema = new Schema({
     const isMatch = await bcrypt.compare(canditatePassword, this.password);
     return isMatch;
   };
-  
+
 
 module.exports = mongoose.model('User', UserSchema)

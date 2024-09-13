@@ -2,7 +2,7 @@ const express = require("express")
 const router = express.Router()
 const authenticateToken = require('../middleware/authenticateToken')
 
-const {registerUser, loginUser, logoutUser, verifyUserEmail} = require('../controllers/userAuthCtrl')
+const {registerUser, loginUser, logoutUser, verifyUserOTP} = require('../controllers/userAuthCtrl')
 const {getAllUsers, getUser, currentUser, updateUser, deleteUser } = require('../controllers/userCtrl')
 const {addChild, getChild, getChildByUser, updateChild, deleteChild} = require('../controllers/childCtrl')
 
@@ -13,9 +13,9 @@ router.route('/:id').get(authenticateToken, getUser)
                     .patch(authenticateToken, updateUser)
                     .delete(authenticateToken, deleteUser)
 router.route('/register').post(registerUser)
-router.route('/verify-mail').post(verifyUserEmail)
+router.route('/verify-mail').post(verifyUserOTP)
 router.route('/login').post(loginUser)
-router.route('/logout').post(logoutUser)
+router.route('/logout').post(authenticateToken, logoutUser)
 
 // Children Routes
 router.route('/child/').post(authenticateToken, addChild)
