@@ -1,30 +1,25 @@
-const sendEmailEthereal = require('../controllers/sendEmail');
+const sendEmailEthereal = require('../controllers/sendEmail')
 
 const sendVerificationEmail = async ({
     name,
     email,
-    verificationToken,
-    origin,
+    otp
 }) => {
-    const verifyEmail = `${origin}/user/verify-email?token=${verificationToken}&email=${email}`;
 
-    const message = `<p>Please confirm your email by clicking on the following link : 
-    <a href="${verifyEmail}">Verify Email</a> </p>`;
+    const message = `<p>Your OTP code is <strong>${otp}</strong>. Please use this code to verify your account.</p>`
 
     try {
         const info = await sendEmailEthereal({
             to: email,
-            subject: 'Email Confirmation',
+            subject: 'Your OTP Code for Account Verification',
             html: `<h4> Hello, ${name}</h4>
             ${message}
             `,
-        });
-        return info;
+        })
+        return info
     } catch (error) {
-        throw new Error('Error sending verification email');
+        throw new Error('Error sending Otp Code')
     }
-};
+}
 
-module.exports = sendVerificationEmail;
-
-
+module.exports = sendVerificationEmail
