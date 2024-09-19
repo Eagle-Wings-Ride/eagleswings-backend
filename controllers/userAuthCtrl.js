@@ -21,6 +21,12 @@ const registerUser = async (req, res) => {
             return res.status(409).json({ message: 'Email already exists' })
         }
 
+        // Check if phone number already exists
+        const phoneNumberExists = await User.findOne({ phone_number });
+        if (phoneNumberExists) {
+            return res.status(409).json({ message: 'Phone number already exists' });
+        }
+
         // Generate Otp code
         const otp = otpGenerator.generate(6, { 
             alphabets: false,
