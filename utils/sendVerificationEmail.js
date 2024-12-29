@@ -11,7 +11,7 @@ const sendVerificationEmail = async ({
     try {
         const info = await sendEmailEthereal({
             to: email,
-            subject: 'Your OTP Code for Account Verification',
+            subject: 'Your OTP Code for Email Verification',
             html: `<h4> Hello, ${name}</h4>
             ${message}
             `,
