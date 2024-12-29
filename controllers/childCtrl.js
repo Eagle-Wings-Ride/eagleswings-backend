@@ -7,13 +7,13 @@ const addChild = async (req, res) => {
     const { fullname, age, grade, school, address, relationship } = req.body;
     
     if (!req.user || !req.user.userId) {
-        return res.status(401).json({ error: 'User not authenticated' });
+        return res.status(401).json({ message: 'User not authenticated' });
     }
     
     const userId = req.user.userId;
     
     if (!fullname || !age) {
-        return res.status(400).json({ error: 'Required fields missing: fullname or age' });
+        return res.status(400).json({ message: 'Required fields missing: fullname or age' });
     }
 
     try {
@@ -30,7 +30,7 @@ const addChild = async (req, res) => {
         await child.save();
         res.status(201).json(child);
     } catch (error) {
-        res.status(400).json({ error: error.message });
+        res.status(400).json({ message: error.message });
     }
 };
 
@@ -39,24 +39,37 @@ const getChild = async (req, res) => {
     try {
         const child = await Child.findById(req.params.id)
         
-        if (!child) return res.status(404).json({ error: 'Child not found' })
-        if (!child.user.equals(req.user.userId)) return res.status(403).json({ error: 'Forbidden' })
+        if (!child) return res.status(404).json({ message: 'Child not found' })
+        if (!child.user.equals(req.user.userId)) return res.status(403).json({ message: 'Forbidden' })
 
         res.status(200).json(child);
     } catch (error) {
-        res.status(500).json({ error: error.message })
+        res.status(500).json({ message: error.message })
     }
 }
 
-// Get all children a user has (still in works)
-const getChildByUser =  async (req, res) => {
+// Get all children for a specific user by user ID (for admins or specific requests)
+const getChildrenByUserId = async (req, res) => {
     try {
-        const children = await Child.find({ user: req.user._id })
+        const { userId } = req.params;
+
+        if (!userId) {
+            return res.status(400).json({ message: 'User not Found' });
+        }
+
+        // Fetch all children associated with the specified user
+        const children = await Child.find({ user: userId });
+
+        if (children.length === 0) {
+            return res.status(404).json({ message: 'No children found for this user' });
+        }
+
         res.status(200).json(children);
     } catch (error) {
-        res.status(500).json({ error: error.message })
+        console.error(error);
+        res.status(500).json({ message: error.message });
     }
-}
+};
 
 // Update a child's information
 const updateChild = async (req, res) => {
@@ -66,11 +79,11 @@ const updateChild = async (req, res) => {
         const child = await Child.findById(id);
 
         if (!child) {
-            return res.status(404).json({ error: 'Child not found' });
+            return res.status(404).json({ message: 'Child not found' });
         }
 
         if (!child.user.includes(req.user.userId)) {
-            return res.status(403).json({ error: 'Forbidden: You are not authorized to update this child' });
+            return res.status(403).json({ message: 'Forbidden: You are not authorized to update this child' });
         }
 
         const updatedChild = await Child.findByIdAndUpdate(id, updates, {
@@ -80,7 +93,7 @@ const updateChild = async (req, res) => {
 
         res.status(200).json({ message: 'Child updated successfully', updatedChild });
     } catch (error) {
-        res.status(400).json({ error: error.message });
+        res.status(400).json({ message: error.message });
     }
 };
 
@@ -91,17 +104,17 @@ const deleteChild = async (req, res) => {
         const child = await Child.findById(id);
 
         if (!child) {
-            return res.status(404).json({ error: 'Child not found' });
+            return res.status(404).json({ message: 'Child not found' });
         }
 
         if (!child.user.includes(req.user.userId)) {
-            return res.status(403).json({ error: 'Forbidden: You are not authorized to delete this child' });
+            return res.status(403).json({ message: 'Forbidden: You are not authorized to delete this child' });
         }
         await Child.findByIdAndDelete(id);
 
         res.status(200).json({ message: 'Child deleted successfully' })
     } catch (error) {
-        res.status(500).json({ error: error.message })
+        res.status(500).json({ message: error.message })
     }
 }
 
@@ -109,7 +122,7 @@ const deleteChild = async (req, res) => {
 module.exports = {
     addChild,
     getChild,
-    getChildByUser,
+    getChildrenByUserId,
     updateChild,
     deleteChild
 };
