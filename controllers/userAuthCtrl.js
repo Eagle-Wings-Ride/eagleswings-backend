@@ -29,7 +29,8 @@ const registerUser = async (req, res) => {
 
         // Generate Otp code
         const otp = otpGenerator.generate(6, { 
-            alphabets: false,
+            lowerCaseAlphabets: false,
+            upperCaseAlphabets: false,
             specialChars: false,
             digits: true
         });
@@ -59,7 +60,7 @@ const registerUser = async (req, res) => {
         })
         res.status(201).json({ message: 'User registered successfully. Please check your email to verify your account.' });
     } catch (error) {
-        res.status(500).json({ message: 'User registration failed', error });
+        res.status(500).json({ message: 'User registration failed', error: error.message || error });
     }
 }
 
