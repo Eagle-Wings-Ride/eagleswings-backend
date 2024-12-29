@@ -5,16 +5,17 @@ require('dotenv').config()
 const sendEmailEthereal = async ({ to, subject, html }) => {
     try {
         const transporter = nodemailer.createTransport({
-            host: 'smtp.gmail.com',
-            port: 587,
+            host: "smtp.resend.com",
+            port: 465,
+            secure: true,
             auth: {
-                user: process.env.EMAIL_USER,
-                pass: process.env.EMAIL_PASSWORD,
+              user: 'resend',
+              pass: process.env.RESEND_API_KEY,
             },
-        });
+          });
 
         let info = await transporter.sendMail({
-            from: '"Eagles Wings Ride Mobile" <timmyspark4@gmail.com>',
+            from: '"Eagles Wings Ride Mobile" <no-reply@eagleswingsride.com>',
             to,
             subject,
             html,
