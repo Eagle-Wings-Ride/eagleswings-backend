@@ -140,6 +140,11 @@ const verifyUserOTP = async (req, res) => {
             return res.status(400).json({ message: 'Invalid email or OTP' })
         }
 
+        // Check if user is already verified
+        if (user.isVerified) {
+            return res.status(200).json({ message: 'User is already verified' });
+        }
+
         // Check if OTP matches and is not expired
         if (user.otp !== otp || user.otpExpiry < new Date()) {
             return res.status(400).json({ message: 'Invalid or expired OTP' })
@@ -156,6 +161,52 @@ const verifyUserOTP = async (req, res) => {
         res.status(500).json({ message: 'OTP verification failed', error })
     }
 }
+
+const resendOTP = async (req, res) => {
+    try {
+        const { email } = req.body;
+
+        // Find user by email
+        const user = await User.findOne({ email });
+        if (!user) {
+            return res.status(400).json({ message: 'User not found' });
+        }
+
+        // Check if user is already verified
+        if (user.isVerified) {
+            return res.status(200).json({ message: 'User is already verified' });
+        }
+
+        // Generate new OTP
+        const newOTP = otpGenerator.generate(6, {
+            lowerCaseAlphabets: false,
+            upperCaseAlphabets: false,
+            specialChars: false,
+            digits: true,
+        });
+
+        // Set OTP expiry (10 minutes)
+        const otpExpiry = new Date();
+        otpExpiry.setMinutes(otpExpiry.getMinutes() + 10);
+
+        // Update user with new OTP
+        user.otp = newOTP;
+        user.otpExpiry = otpExpiry;
+
+        await user.save();
+
+        // Send verification email
+        await sendVerificationEmail({
+            name: user.fullname,
+            email: user.email,
+            otp: newOTP,
+        });
+
+        res.status(200).json({ message: 'OTP resent successfully' });
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to resend OTP', error });
+    }
+};
 
 const updateUserPassword = async (req, res) => {
     const { oldPassword, newPassword } = req.body
@@ -182,5 +233,6 @@ module.exports = {
     loginUser,
     logoutUser,
     verifyUserOTP,
+    resendOTP,
     updateUserPassword,
 }
