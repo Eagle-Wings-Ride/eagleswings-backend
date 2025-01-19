@@ -1,53 +1,70 @@
-const mongoose = require('mongoose')
-const { Schema } = mongoose
+const mongoose = require('mongoose');
+const {Schema} = mongoose;
+
 
 const BookSchema = new Schema({
-    pick_up_location : {
+    pick_up_location: {
         type: String,
-        required : true
+        required: true,
     },
-    drop_off_location : {
+    drop_off_location: {
         type: String,
-        required : true
+        required: true,
     },
-    ride_type : {
+    ride_type: {
         type: String,
-        required : true
+        enum: ['freelance', 'inhouse'],
+        required: true,
     },
-    trip_type : {
+    trip_type: {
         type: String,
-        required : true
+        enum: ['return', 'one-way'],
+        required: true,
     },
-    schedule : {
+    schedule: {
         type: String,
-        required : true
+        enum: ['2 weeks', '1 month'],
+        required: true,
     },
-    start_date : {
+    start_date: {
         type: String,
-        required : true
+        required: true,
     },
-    pick_up_time : {
+    pick_up_time: {
         type: String,
-        required : true
+        required: true,
     },
-    drop_off_time : {
+    drop_off_time: {
         type: String,
-        required : true
+        required: true,
     },
-    user: { 
+    status: {
+        type: String,
+        enum: ['Booked', 'Ongoing', 'Completed', 'Cancelled'],
+        default: 'Booked',
+    },
+    user: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
-        required: true
+        required: true,
     },
-    child: { 
+    child: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Child',
-        required: true
+        required: true,
+    },
+    cancellationReason: {
+        type: String,
+        default: null,
+    },
+    cancellationDate: {
+        type: Date,
+        default: null,
     },
     createdAt: {
         type: Date,
-        default: Date.now() 
-    }
-})
+        default: Date.now,
+    },
+});
 
-module.exports = mongoose.model('Booking', BookSchema)
+module.exports = mongoose.model('Bookings', BookSchema);
