@@ -8,13 +8,13 @@ const generateOTPAndExpiry = (req, res, next) => {
       digits: true,
     });
   
-    const otpExpiry = new Date();
-    otpExpiry.setMinutes(otpExpiry.getMinutes() + 10);
+    const otpExpiry = new Date()
+    otpExpiry.setMinutes(otpExpiry.getMinutes() + 10)
   
-    req.otp = otp;
-    req.otpExpiry = otpExpiry;
+    req.otp = otp
+    req.otpExpiry = otpExpiry
   
-    next();
-  };
+    next()
+  }
 
   module.exports = generateOTPAndExpiry
