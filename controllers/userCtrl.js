@@ -19,7 +19,30 @@ const getAllUsers = async (req, res) => {
 }
 
 const currentUser =  async (req, res) => {
-    res.status(200).json({ user: req.user });
+
+  try{
+    const email = req.user.email
+    const curruser = await User.findOne({email})
+
+    if(!curruser){
+      return res.status(404).json({message: "User not found"})
+    }
+
+    res.status(200).json({
+      message: "User details retreived successfully",
+      user:{
+        id: user.id,
+        fullname: user.fullname,
+        email: user.email,
+        address: user.address,
+        phone_number: user.phone_number,
+        is_verified: user.is_verified
+      }
+    })
+  } catch (error){
+    console.error(error);
+    res.status(500).json({ message: 'An error occurred while fetching user details' });
+  }
 }
 
 const updateUser =  async (req, res) => {
