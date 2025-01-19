@@ -31,12 +31,12 @@ const currentUser =  async (req, res) => {
     res.status(200).json({
       message: "User details retreived successfully",
       user:{
-        id: user.id,
-        fullname: user.fullname,
-        email: user.email,
-        address: user.address,
-        phone_number: user.phone_number,
-        is_verified: user.is_verified
+        id: curruser.id,
+        fullname: curruser.fullname,
+        email: curruser.email,
+        address: curruser.address,
+        phone_number: curruser.phone_number,
+        is_verified: curruser.is_verified
       }
     })
   } catch (error){
