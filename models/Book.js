@@ -40,8 +40,8 @@ const BookSchema = new Schema({
     },
     status: {
         type: String,
-        enum: ['Booked', 'Ongoing', 'Completed', 'Cancelled'],
-        default: 'Booked',
+        enum: ['booked', 'ongoing', 'completed', 'cancelled'],
+        default: 'booked',
     },
     user: {
         type: mongoose.Schema.Types.ObjectId,

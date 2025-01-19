@@ -23,7 +23,7 @@ router.get('/rides/recent/:userId', authenticateToken, getRecentRides)
 router.get('/rides/status/:userId/:status', authenticateToken, getRidesByStatus)
 
 // Route to update ride status
-router.get('/rides/status/:rideId', authenticateToken, updateRideStatus)
+router.patch('/rides/status/:rideId', authenticateToken, updateRideStatus)
 
 
 // Route to upload payment file (coming up)
