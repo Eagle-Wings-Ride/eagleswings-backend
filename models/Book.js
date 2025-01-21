@@ -40,8 +40,24 @@ const BookSchema = new Schema({
     },
     status: {
         type: String,
-        enum: ['booked', 'ongoing', 'completed', 'cancelled'],
+        enum: ['booked', 'ongoing','failed', 'completed', 'cancelled'],
         default: 'booked',
+    },
+    latitude:{
+        type: String,
+        required: true,
+    },
+    longitude:{
+        type: String,
+        required: true,
+    },
+    cancellationReason: {
+        type: String,
+        default: null,
+    },
+    cancellationDate: {
+        type: Date,
+        default: null,
     },
     user: {
         type: mongoose.Schema.Types.ObjectId,
@@ -52,14 +68,6 @@ const BookSchema = new Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Child',
         required: true,
-    },
-    cancellationReason: {
-        type: String,
-        default: null,
-    },
-    cancellationDate: {
-        type: Date,
-        default: null,
     },
     createdAt: {
         type: Date,

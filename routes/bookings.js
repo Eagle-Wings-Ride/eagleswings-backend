@@ -17,10 +17,10 @@ router.get('/ride/:childId', authenticateToken, getRideByChild)
 router.get('/all-rides/', authenticateToken, getAllRides)
 
 // Route to get recent rides
-router.get('/rides/recent/:userId', authenticateToken, getRecentRides)
+router.get('/rides/recent/:childId', authenticateToken, getRecentRides)
 
 // Route to get rides by status
-router.get('/rides/status/:userId/:status', authenticateToken, getRidesByStatus)
+router.get('/rides/status/:childId/:status', authenticateToken, getRidesByStatus)
 
 // Route to update ride status
 router.patch('/rides/status/:rideId', authenticateToken, updateRideStatus)
