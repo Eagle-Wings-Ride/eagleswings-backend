@@ -40,8 +40,11 @@ const bookRide = async (req, res) => {
         start_date,
         pick_up_time,
         drop_off_time,
-        latitude,
-        longitude
+        start_latitude,
+        start_longitude,
+        end_latitude,
+        end_longitude,
+        
     } = req.body;
 
     try {
@@ -75,8 +78,10 @@ const bookRide = async (req, res) => {
             status: BookingStatus.BOOKED,
             user: req.user.userId,
             child: childId,
-            latitude,
-            longitude,
+            start_latitude,
+            start_longitude,
+            end_latitude,
+            end_longitude
         });
         
         // to add payment here (payment before being booked successfully)
@@ -115,9 +120,9 @@ const getRideByChild = async (req, res) => {
     try{
         const booking = await Book.find({child: childId}).populate('child')
 
-        if (!booking.length) {
-            return res.status(404).json({ message: "No rides found for this child" })
-        }
+        // if (!booking.length) {
+        //     return res.status(404).json({ message: "No rides found for this child" })
+        // }
 
         const isChildOwnedByUser = booking.every(booking => booking.user.toString() === req.user.userId.toString())
 
@@ -159,9 +164,9 @@ const getRecentRides = async (req, res) => {
             .populate('user', 'fullname email phone_number address')
             .populate('child', 'fullname school address grade age')
 
-        if (!bookings.length) {
-            return res.status(404).json({ message: 'No bookings found for this user' })
-        }
+        // if (!bookings.length) {
+        //     return res.status(404).json({ message: 'No bookings found for this user' })
+        // }
     
         res.status(200).json({ bookings });
     } catch (error) {
@@ -198,9 +203,9 @@ const getRidesByStatus = async (req, res) => {
         // Fetch rides
         const rides = await Book.find(query).sort({ createdAt: -1 })
 
-        if (!rides.length) {
-            return res.status(404).json({ message: 'No rides found for this user with the specified status' })
-        }
+        // if (!rides.length) {
+        //     return res.status(404).json({ message: 'No rides found for this user with the specified status' })
+        // }
 
         res.status(200).json({ rides })
     } catch (error) {
