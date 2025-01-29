@@ -3,6 +3,7 @@ const app = express()
 const users = require('./routes/user')
 const booking = require('./routes/bookings')
 const rates = require('./routes/rates')
+const notFoundHandler = require('./middleware/notFound')
 const connectDB = require('./db/connect_db')
 require('dotenv').config()
 
@@ -15,6 +16,9 @@ app.use(express.json())
 app.use('/api/v1/users', users)
 app.use('/api/v1/book', booking)
 app.use('/api/v1/rates', rates)
+
+// Error for 404 handlers
+app.use(notFoundHandler)
 
 
 const port = process.env.PORT || 5000;
