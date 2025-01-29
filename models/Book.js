@@ -43,11 +43,19 @@ const BookSchema = new Schema({
         enum: ['booked', 'ongoing','failed', 'completed', 'cancelled'],
         default: 'booked',
     },
-    latitude:{
+    start_latitude:{
         type: String,
         required: true,
     },
-    longitude:{
+    start_longitude:{
+        type: String,
+        required: true,
+    },
+    end_latitude:{
+        type: String,
+        required: true,
+    },
+    end_longitude:{
         type: String,
         required: true,
     },
