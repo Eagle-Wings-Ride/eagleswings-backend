@@ -1,4 +1,5 @@
 const express = require('express');
+const cors = require('cors')
 const app = express()
 const users = require('./routes/user')
 const booking = require('./routes/bookings')
@@ -10,6 +11,7 @@ require('dotenv').config()
 
 
 // middleware
+app.use(cors())
 app.use(express.json())
 
 
