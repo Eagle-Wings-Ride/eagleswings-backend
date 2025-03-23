@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors')
 const app = express()
 const users = require('./routes/user')
+const driver = require('./routes/driver')
 const booking = require('./routes/bookings')
 const rates = require('./routes/rates')
 const admin = require('./routes/admin')
@@ -17,6 +18,7 @@ app.use(express.json())
 
 // Routes
 app.use('/api/v1/users', users)
+app.use('/api/v1/drivers', driver)
 app.use('/api/v1/book', booking)
 app.use('/api/v1/rates', rates)
 app.use('/api/v1/admin', admin)
