@@ -137,10 +137,19 @@ const getRideByChild = async (req, res) => {
 
 
 // get all rides
+
 const getAllRides = async (req, res) => {
-    const rides = await Book.find({})
-    res.status(200).json({rides})
-}
+    try {
+        const rides = await Book.find({})
+            .populate('user', 'fullname address phone_number') // Fetch specific fields from users
+            .populate('child', 'name image grade school'); // Fetch specific fields from child
+
+        res.status(200).json({ rides });
+    } catch (error) {
+        res.status(500).json({ message: 'Error fetching rides', error: error.message });
+    }
+};
+
 
 
 // get recent rides
