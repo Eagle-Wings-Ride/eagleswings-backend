@@ -1,6 +1,5 @@
 const mongoose = require('mongoose')
 const { Schema } = mongoose
-const validator = require('validator');
 const bcrypt = require('bcryptjs');
 
 
@@ -19,7 +18,7 @@ const UserSchema = new Schema({
     password: {
       type: String,
       required: [true, 'Please provide password'],
-      minlength: [6, 'password length too'],
+      minlength: [6, 'password length too short'],
     },
     phone_number : {
       type: String,
