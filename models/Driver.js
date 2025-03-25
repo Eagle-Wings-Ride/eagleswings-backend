@@ -51,20 +51,13 @@ const DriverSchema = new Schema({
         enum: ['booked', 'notavailable','busy', 'completed', 'cancelled'],
         default: 'notavailable',
     },
-    start_latitude:{
-        type: String,
-    },
-    start_longitude:{
-        type: String,
-    },
-    end_latitude:{
-        type: String,
-    },
-    end_longitude:{
-        type: String,
-    },
+    start_latitude: String,
+    start_longitude: String,
+    end_latitude: String,
+    end_longitude:String,
     otp: String,
     otpExpiry: Date,
+
     createdAt: {
         type: Date,
         default: Date.now() 
