@@ -1,4 +1,3 @@
-const { Model } = require('mongoose')
 const Admin = require('../models/Admin')
 const TokenBlacklist = require('../models/tokenBlacklist')
 const sendVerificationEmail = require('../utils/sendVerificationEmail')
