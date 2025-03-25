@@ -1,6 +1,6 @@
-const Admin = require('../models/Admin')
-const TokenBlacklist = require('../models/tokenBlacklist')
-const sendVerificationEmail = require('../utils/sendVerificationEmail')
+const Admin = require('../../models/Admin')
+const TokenBlacklist = require('../../models/tokenBlacklist')
+const sendVerificationEmail = require('../../utils/sendVerificationEmail')
 const jwt = require('jsonwebtoken')
 const { compare } = require('bcryptjs')
 
