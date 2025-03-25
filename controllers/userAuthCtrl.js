@@ -1,8 +1,8 @@
-const { Model } = require('mongoose')
 const User = require('../models/User')
 const TokenBlacklist = require('../models/tokenBlacklist')
 const sendVerificationEmail = require('../utils/sendVerificationEmail')
 const jwt = require('jsonwebtoken')
+const { compare } = require('bcryptjs')
 
 
 const registerUser = async (req, res) => {
@@ -179,63 +179,38 @@ const resendOTP = async (req, res) => {
         res.status(500).json({ message: 'Failed to resend OTP', error: error.message });
     }
 };
-// in progress (doesnt go with app flow)
+
+// in progress (doesnt go with app flow yet)
+
 const forgotPassword = async (req, res) => {
-    try {
-        const { email, oldPassword, newPassword } = req.body;
 
-        // Validate request body
-        if (!email || !oldPassword || !newPassword) {
-            return res.status(400).json({ message: 'Please provide all required fields' });
-        }
+    const {email, newPassword, confirmPassword} = req.body
 
-        // Find user by email
-        const user = await User.findOne({ email });
-        if (!user) {
-            return res.status(404).json({ message: 'User not found' });
-        }
-
-        // Check if user is verified
-        if (!user.isVerified) {
-            return res.status(400).json({ message: 'User is not verified' });
-        }
-
-        // Verify old password
-        const isPasswordCorrect = await user.comparePassword(oldPassword);
-        if (!isPasswordCorrect) {
-            return res.status(401).json({ message: 'Invalid credentials' });
-        }
-
-        // Update user with OTP and expiry
-        user.otp = req.otp;
-        user.otpExpiry = req.otpExpiry;
-
-        await sendVerificationEmail({
-            name: user.fullname,
-            email: user.email,
-            otp: req.otp,
-            type: "Password Reset",
-        });
-
-        // Update password
-        user.password = newPassword;
-
-        // Send post-change verification email
-        await sendVerificationEmail({
-            name: user.fullname,
-            email: user.email,
-            otp: req.otp,
-            type: "Password Updated",
-        });
-
-        await user.save();
-
-        res.status(200).json({ message: 'Success! Password updated.' });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'An error occurred. Please try again.' });
+    if (newPassword !== confirmPassword){
+        return res.status(400).json({message: "Passwords don't match"})
     }
-};
+    try {
+        const user = await User.findOne({email})
+        if (!user) {
+            return res.status(404).json({message: "User not found"})
+        }
+        // check if new password is the same as previous password
+        const isSamePassword = await compare(newPassword, user.password)
+    
+        if (isSamePassword){
+            return res.status(400).json({mesage: "New Password cannot be the same as old password"})
+        }
+        user.password = newPassword
+    
+        await user.save()
+        res.status(200).json({ message:" Password reset successfully " })
+        
+    } catch (error) {
+        console.log('Reset password Failed ;', error)
+        res.status(500).json({ message:" Server error" })
+    }
+}
+
 
 
 module.exports = {
