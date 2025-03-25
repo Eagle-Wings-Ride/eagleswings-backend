@@ -8,7 +8,7 @@ const {registerDriver,
        loginDriver,
        logoutDriver,
        verifyDriverOTP,
-       resendDriverOTP} = require ('../controllers/driverAuthCtrl')
+       resendDriverOTP} = require('../controllers/auth/driverAuthCtrl')
 
 const {getAllDrivers,
        getDriver,

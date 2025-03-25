@@ -4,7 +4,7 @@ const authenticateToken = require('../middleware/authenticateToken')
 const upload = require('../cloudinary/multerConfig')
 const generateOTPAndExpiry = require('../middleware/generateOtp')
 
-const {registerUser, loginUser, logoutUser, verifyUserOTP, resendOTP, forgotPassword} = require('../controllers/userAuthCtrl')
+const {registerUser, loginUser, logoutUser, verifyUserOTP, resendOTP, forgotPassword} = require('../controllers/auth/userAuthCtrl')
 const {getAllUsers, getUser, currentUser, updateUser, deleteUser } = require('../controllers/userCtrl')
 const {addChild, getChild,getChildrenByUserId, updateChild, deleteChild} = require('../controllers/childCtrl')
 

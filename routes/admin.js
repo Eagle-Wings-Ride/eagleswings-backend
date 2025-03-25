@@ -3,7 +3,7 @@ const router = express.Router()
 const generateOTPAndExpiry = require('../middleware/generateOtp')
 const authenticateToken = require('../middleware/authenticateToken')
 
-const {registerAdmin, loginAdmin, verifyAdminOTP, resendAdminOTP} = require('../controllers/adminAuthCtrl')
+const {registerAdmin, loginAdmin, verifyAdminOTP, resendAdminOTP} = require('../controllers/auth/adminAuthCtrl')
 const {approveDriver, getDriverByLocation} = require('../controllers/adminCtrl')
 
 // AUTH URL
