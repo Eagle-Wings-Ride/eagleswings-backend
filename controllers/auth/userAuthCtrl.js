@@ -1,6 +1,6 @@
-const User = require('../models/User')
-const TokenBlacklist = require('../models/tokenBlacklist')
-const sendVerificationEmail = require('../utils/sendVerificationEmail')
+const User = require('../../models/User')
+const TokenBlacklist = require('../../models/tokenBlacklist')
+const sendVerificationEmail = require('../../utils/sendVerificationEmail')
 const jwt = require('jsonwebtoken')
 const { compare } = require('bcryptjs')
 

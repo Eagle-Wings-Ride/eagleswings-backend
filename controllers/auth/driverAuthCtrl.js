@@ -1,6 +1,6 @@
-const Driver = require('../models/Driver')
-const TokenBlacklist = require('../models/tokenBlacklist')
-const sendVerificationEmail = require('../utils/sendVerificationEmail')
+const Driver = require('../../models/Driver')
+const TokenBlacklist = require('../../models/tokenBlacklist')
+const sendVerificationEmail = require('../../utils/sendVerificationEmail')
 const jwt = require('jsonwebtoken')
 const { compare } = require('bcryptjs')
 
