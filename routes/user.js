@@ -1,6 +1,7 @@
 const express = require("express")
 const router = express.Router()
 const authenticateToken = require('../middleware/authenticateToken')
+const upload = require('../cloudinary/multerConfig')
 const generateOTPAndExpiry = require('../middleware/generateOtp')
 
 const {registerUser, loginUser, logoutUser, verifyUserOTP, resendOTP, forgotPassword} = require('../controllers/userAuthCtrl')
@@ -21,7 +22,7 @@ router.route('/login').post(loginUser)
 router.route('/logout').post(authenticateToken, logoutUser)
 
 // Children Routes
-router.route('/child/').post(authenticateToken, addChild)
+router.route('/child/').post(authenticateToken, upload.single('image'), addChild)
 router.route('/child/:id').get(authenticateToken, getChild)
                         .patch(authenticateToken, updateChild)
                         .delete(authenticateToken, deleteChild)

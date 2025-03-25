@@ -1,5 +1,6 @@
 const { Model } = require('mongoose')
 const Child = require('../models/Child')
+const uploadToCloudinary = require('../cloudinary/uploadCloudinary')
 
 // Add/Register a Child
 
@@ -10,15 +11,23 @@ const addChild = async (req, res) => {
         return res.status(401).json({ message: 'User not authenticated' });
     }
     
-    const userId = req.user.userId;
-    
     if (!fullname || !age) {
         return res.status(400).json({ message: 'Required fields missing: fullname or age' });
     }
 
+    const userId = req.user.userId;
+    
     try {
+        let imageUrl = null
+
+        if(req.file){
+            const uploadedFile = await uploadToCloudinary(req.file, 'children');
+            imageUrl = uploadedFile.url;
+        }
+
         const child = new Child({
             fullname,
+            image: imageUrl,
             age,
             grade,
             school,

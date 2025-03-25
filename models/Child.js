@@ -8,6 +8,7 @@ const ChildSchema = new Schema({
       minlength: 3,
       maxlength: 50,
     },
+    image: String,
     age: {
       type: Number,
       required: [true, 'Please provide ward age']
