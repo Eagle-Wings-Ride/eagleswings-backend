@@ -1,6 +1,5 @@
 const { mongoose } = require('mongoose')
 const { Schema } = mongoose
-const validator = require('validator');
 const bcrypt = require('bcryptjs');
 
 
@@ -13,36 +12,26 @@ const DriverSchema = new Schema({
     },
     email : {
         type: String,
-        unique: True,
+        unique: true,
         required : [true, 'Please provide Email']
     },
     password: {
         type: String,
         required: [true, 'Please provide password'],
-        minlength: [6, 'password length too'],
+        minlength: [6, 'password length too short'],
     },
     phone_number : {
         type: String,
-        unique: True,
-        required: [true, 'Please provide a Phone Number'],
+        unique: true
     },
     age: {
         type: String,
-        required: [true, 'Please provide your age'],
         minlength: [2, 'Enter an acceptable age'],
     },
-    residential_address : {
-        type: String,
-        required: [true, 'Please provide your Address'],
-    },
-    preferred_route : {
-        type: String,
-        required : [true, 'Please enter your preferred route']
-    },
-    reasons : {
-        type: String,
-        required : [true, 'Please enter a reason for the answer above']
-    },
+    image: String,
+    residential_address: String,
+    preferred_route: String,
+    reasons: String,
     car_insurance : String,
     background_check : String,
     government_issued_id : String,
@@ -53,11 +42,29 @@ const DriverSchema = new Schema({
         type: Boolean,
         default: false
     },
-    isDriverVerified: {
+    isDriverApproved: {
         type: Boolean,
         default: false
     },
-    verificationToken: String,
+    status: {
+        type: String,
+        enum: ['booked', 'notavailable','busy', 'completed', 'cancelled'],
+        default: 'notavailable',
+    },
+    start_latitude:{
+        type: String,
+    },
+    start_longitude:{
+        type: String,
+    },
+    end_latitude:{
+        type: String,
+    },
+    end_longitude:{
+        type: String,
+    },
+    otp: String,
+    otpExpiry: Date,
     createdAt: {
         type: Date,
         default: Date.now() 
