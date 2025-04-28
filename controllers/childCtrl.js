@@ -49,7 +49,13 @@ const getChild = async (req, res) => {
         const child = await Child.findById(req.params.id)
         
         if (!child) return res.status(404).json({ message: 'Child not found' })
-        if (!child.user.equals(req.user.userId)) return res.status(403).json({ message: 'Forbidden' })
+        // if (!child.user.equals(req.user.userId)) return res.status(403).json({ message: 'Forbidden' })
+
+        const isAdmin = await Admin.findById(req.user.userId);
+
+        if (!isAdmin && !child.user.equals(req.user.userId)) {
+            return res.status(403).json({ message: 'Forbidden' });
+        }
 
         res.status(200).json(child);
     } catch (error) {
