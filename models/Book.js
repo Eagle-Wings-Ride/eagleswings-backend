@@ -40,7 +40,7 @@ const BookSchema = new Schema({
     },
     status: {
         type: String,
-        enum: ['booked', 'ongoing','failed', 'completed', 'cancelled'],
+        enum: ['booked', 'paid', 'assigned', 'ongoing','payment_failed', 'completed', 'cancelled'],
         default: 'booked',
     },
     start_latitude:{
@@ -77,6 +77,11 @@ const BookSchema = new Schema({
         ref: 'Child',
         required: true,
     },
+    driver: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Driver',
+        default: null,
+    },    
     createdAt: {
         type: Date,
         default: Date.now,

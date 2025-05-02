@@ -1,4 +1,5 @@
 const { Model } = require('mongoose')
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY)
 const Book = require('../models/Book')
 const Child = require('../models/Child')
 
@@ -22,7 +23,9 @@ const ScheduleType = {
 const BookingStatus = {
     BOOKED: 'booked',
     ONGOING: 'ongoing',
-    FAILED: 'failed',
+    PAID:'paid',
+    ASSIGNED: 'assigned',
+    FAILED: 'payment_failed',
     COMPLETED: 'completed',
     CANCELLED: 'cancelled',
 };
@@ -65,6 +68,10 @@ const bookRide = async (req, res) => {
             return res.status(400).json({ message: "Child not found or does not belong to this user" });
         }
 
+         // Prevent duplicate unpaid bookings for the same child
+        const existing = await Book.findOne({ child: childId, status: BookingStatus.BOOKED });
+        if (existing) return res.status(400).json({ message: "A pending booking already exists for this child" });
+
         // Create booking
         const booking = new Book({
             pick_up_location,
@@ -84,21 +91,75 @@ const bookRide = async (req, res) => {
             end_longitude
         });
         
-        // to add payment here (payment before being booked successfully)
-        
         await booking.save();
 
-
         res.status(201).json({
-            message: 'Ride booked successfully.',
+            message: 'Ride booked successfully, proceed to make payment',
             booking,
         });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'An error occurred while booking the ride.', error: error.message });
     }
-};
+}
 
+// Make Payment (still in works 80% ready)
+const makePayment = async (req, res) => {
+    const { bookingId, paymentMethodId, amount, currency } = req.body;
+  
+    // Validate currency
+    if (!['usd', 'cad'].includes(currency)) {
+      return res.status(400).json({ message: 'Invalid currency. Only USD and CAD are supported.' });
+    }
+  
+    try {
+        const booking = await Book.findById(bookingId);
+        if (!booking) {
+            return res.status(404).json({ message: 'Booking not found' });
+        }
+    
+        // Check if user is the owner of the booking
+        if (booking.user.toString() !== req.user.userId) {
+            return res.status(403).json({ message: 'Unauthorized access to booking' });
+        }
+    
+        // Only allow payment if status is BOOKED or FAILED
+        if (![BookingStatus.BOOKED, BookingStatus.FAILED].includes(booking.status)) {
+            return res.status(400).json({ message: 'Payment not allowed for this booking status' });
+        }
+    
+        // Convert amount to cents
+        const amountInCents = Math.round(amount * 100);
+    
+        // Create PaymentIntent
+        const paymentIntent = await stripe.paymentIntents.create({
+            amount: amountInCents,
+            currency,
+            payment_method: paymentMethodId,
+            confirm: true,
+            automatic_payment_methods: {
+                enabled: true,
+                allow_redirects: 'never',
+            },
+        })
+    
+        // Payment succeeded — update booking status
+        await Book.findByIdAndUpdate(bookingId, { status: BookingStatus.PAID })
+    
+        res.status(200).json({
+            message: 'Payment successful. A driver will be assigned shortly.',
+            client_secret: paymentIntent.client_secret,
+        });
+    } catch (error) {
+        // Payment failed — update status to FAILED
+        await Book.findByIdAndUpdate(bookingId, { status: BookingStatus.FAILED });
+    
+        res.status(500).json({
+            message: 'Payment failed. Please try again shortly.',
+            error: error.message,
+        })
+    }
+}
 
 // find all rides created by the user
 const getRidesByUser = async (req, res) => {
@@ -112,17 +173,12 @@ const getRidesByUser = async (req, res) => {
     }
 }
 
-
 // get all rides by children 
 const getRideByChild = async (req, res) => { 
     const {childId} = req.params
 
     try{
         const booking = await Book.find({child: childId}).populate('child')
-
-        // if (!booking.length) {
-        //     return res.status(404).json({ message: "No rides found for this child" })
-        // }
 
         const isChildOwnedByUser = booking.every(booking => booking.user.toString() === req.user.userId.toString())
 
@@ -135,22 +191,19 @@ const getRideByChild = async (req, res) => {
     }
 }
 
-
 // get all rides
-
 const getAllRides = async (req, res) => {
     try {
         const rides = await Book.find({})
             .populate('user', 'fullname address phone_number') // Fetch specific fields from users
-            .populate('child', 'name image grade school'); // Fetch specific fields from child
+            .populate('child', 'name image grade school') // Fetch specific fields from child
+            .populate('driver', 'fullname image status') // Fetch specific fields from drivers
 
         res.status(200).json({ rides });
     } catch (error) {
         res.status(500).json({ message: 'Error fetching rides', error: error.message });
     }
-};
-
-
+}
 
 // get recent rides
 const getRecentRides = async (req, res) => {
@@ -172,10 +225,7 @@ const getRecentRides = async (req, res) => {
             .sort({ createdAt: -1 })
             .populate('user', 'fullname email phone_number address')
             .populate('child', 'fullname school address grade age')
-
-        // if (!bookings.length) {
-        //     return res.status(404).json({ message: 'No bookings found for this user' })
-        // }
+            .populate('driver', 'fullname image status ')
     
         res.status(200).json({ bookings });
     } catch (error) {
@@ -212,16 +262,11 @@ const getRidesByStatus = async (req, res) => {
         // Fetch rides
         const rides = await Book.find(query).sort({ createdAt: -1 })
 
-        // if (!rides.length) {
-        //     return res.status(404).json({ message: 'No rides found for this user with the specified status' })
-        // }
-
         res.status(200).json({ rides })
     } catch (error) {
         res.status(500).json({ message: 'Failed to fetch rides', error: error.message })
     }
 };
-
 
 const updateRideStatus = async (req, res) => {
     try {
@@ -272,6 +317,7 @@ const updateRideStatus = async (req, res) => {
 
 module.exports = {
     bookRide,
+    makePayment,
     getRidesByUser,
     getRideByChild,
     getAllRides,
