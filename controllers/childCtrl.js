@@ -1,5 +1,6 @@
 const { Model } = require('mongoose')
 const Child = require('../models/Child')
+const Admin = require('../models/Admin')
 const uploadToCloudinary = require('../cloudinary/uploadCloudinary')
 
 // Add/Register a Child
@@ -51,7 +52,7 @@ const getChild = async (req, res) => {
         if (!child) return res.status(404).json({ message: 'Child not found' })
         // if (!child.user.equals(req.user.userId)) return res.status(403).json({ message: 'Forbidden' })
 
-        const isAdmin = await Admin.findById(req.user.userId);
+        const isAdmin = await Admin.findById(req.user.adminId);
 
         if (!isAdmin && !child.user.equals(req.user.userId)) {
             return res.status(403).json({ message: 'Forbidden' });
