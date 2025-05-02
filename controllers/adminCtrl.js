@@ -1,16 +1,16 @@
-const Admin = require("../models/Admin")
-const Driver = require("../models/Driver")
+const Admin = require('../models/Admin')
+const Driver = require('../models/Driver')
+const Book = require('../models/Book')
 
 
 const approveDriver = async (req, res) => {
     const {id:driverId} = req.params
-    const adminId = req.user?.id
+    const {is_approved} = req.body
+    const adminId = req.user.adminId
 
     if (!adminId) {
         return res.status(401).json({ message: "Unauthorized: Admin ID missing" });
     }
-
-    const {is_approved} = req.body
 
     if(is_approved == undefined){
         res.status(400).json({message:"Missing required field: is_approved"})
@@ -22,10 +22,11 @@ const approveDriver = async (req, res) => {
         return res.status(404).json({message: "Admin not Found"})
     }
 
-    const newDriver = await Driver.findByIdAndUpdate(driverId, {is_approved}, {
+    const newDriver = await Driver.findByIdAndUpdate(driverId, {isDriverApproved: is_approved}, {
         new: true,
         runValidators: true
     })
+
     
     if (!newDriver){
         return res.status(404).json({message: "Driver not Found"})
@@ -33,6 +34,62 @@ const approveDriver = async (req, res) => {
 
     res.status(200).json({message:"Driver approved!", newDriver});
 
+}
+
+// Assign driver to the ride (booking)
+const assignDriverToRide = async (req, res) => {
+    const { driverId } = req.body
+    const { bookingId } = req.params
+    const adminId = req.user.adminId
+
+    if (!adminId) {
+        return res.status(401).json({ message: "Unauthorized: Admin ID missing" })
+    }
+
+    const admin = await Admin.findById(adminId)
+    if (!admin) {
+        return res.status(404).json({ message: "Admin not found" })
+    }
+
+    try {
+        // Ensure booking exists
+        const booking = await Book.findById(bookingId)
+        if (!booking) return res.status(404).json({ message: "Booking not found" })
+
+        // Ensure driver exists
+        const driver = await Driver.findById(driverId)
+        if (!driver) {
+            return res.status(404).json({ message: "Driver not found" })
+        } else if (!driver.isDriverApproved){
+            return res.status(404).json({ message: "Driver hasn't been approved yet" })
+        }
+
+
+        // Update booking with driver and status
+        const updatedBooking = await Book.findByIdAndUpdate(
+            bookingId,
+            { driver: driverId, status: 'assigned' },
+            { new: true, runValidators: true }
+        )
+
+        // Update driver status
+        await Driver.findByIdAndUpdate(
+            driverId,
+            { status: 'assigned' },
+            { new: true, runValidators: true }
+        )
+
+        res.status(200).json({
+            message: 'Driver assigned successfully',
+            booking: updatedBooking
+        })
+
+    } catch (error) {
+        res.status(500).json({
+            message: "Error assigning driver",
+            error: error.message
+        })
+    }
 }
 
 // get driver by location (in progress)
@@ -61,5 +118,6 @@ const getDriverByLocation = async (req, res) => {
 
 module.exports = {
     approveDriver,
+    assignDriverToRide
     // getDriverByLocation
 }
