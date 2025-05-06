@@ -13,10 +13,7 @@ const ChildSchema = new Schema({
       type: Number,
       required: [true, 'Please provide ward age']
     },
-    grade: {
-      type: Number,
-      maxlength: 2
-    },
+    grade: String,
     school : String,
     address: String,
     relationship: String,
