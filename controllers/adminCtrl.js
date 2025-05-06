@@ -2,39 +2,40 @@ const Admin = require('../models/Admin')
 const Driver = require('../models/Driver')
 const Book = require('../models/Book')
 
-
 const approveDriver = async (req, res) => {
-    const {id:driverId} = req.params
-    const {is_approved} = req.body
-    const adminId = req.user.adminId
+    const { id: driverId } = req.params;
+    const { is_approved } = req.body;
+    const adminId = req.user?.adminId;
 
     if (!adminId) {
         return res.status(401).json({ message: "Unauthorized: Admin ID missing" });
     }
 
-    if(is_approved == undefined){
-        res.status(400).json({message:"Missing required field: is_approved"})
-    }
-    
-    const admin = await Admin.findById(adminId)
-
-    if (!admin){
-        return res.status(404).json({message: "Admin not Found"})
+    if (typeof is_approved !== 'boolean') {
+        return res.status(400).json({ message: "Missing or invalid field: is_approved must be boolean" });
     }
 
-    const newDriver = await Driver.findByIdAndUpdate(driverId, {isDriverApproved: is_approved}, {
-        new: true,
-        runValidators: true
+    const admin = await Admin.findById(adminId);
+    if (!admin) {
+        return res.status(404).json({ message: "Admin not found" });
+    }
+
+    const updatedDriver = await Driver.findByIdAndUpdate(
+        driverId,
+        { isDriverApproved: is_approved },
+        { new: true, runValidators: true }
+    );
+
+    if (!updatedDriver) {
+        return res.status(404).json({ message: "Driver not found" });
+    }
+
+    res.status(200).json({
+        message: `Driver has been ${is_approved ? 'approved' : 'disapproved'} !`,
+        driver: updatedDriver
     })
-
-    
-    if (!newDriver){
-        return res.status(404).json({message: "Driver not Found"})
-    }
-
-    res.status(200).json({message:"Driver approved!", newDriver});
-
 }
+
 
 // Assign driver to the ride (booking)
 const assignDriverToRide = async (req, res) => {
