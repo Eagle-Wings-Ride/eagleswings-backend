@@ -77,11 +77,10 @@ const BookSchema = new Schema({
         ref: 'Child',
         required: true,
     },
-    driver: {
+    drivers: [{
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Driver',
-        default: null,
-    },    
+    }],    
     createdAt: {
         type: Date,
         default: Date.now,
