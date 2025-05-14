@@ -14,7 +14,8 @@ const {getAllDrivers,
        getDriver,
        updateDriver,
        deleteDriver,
-       uploadDriverDetails} = require('../controllers/driverCtrl')
+       uploadDriverDetails,
+       viewRides} = require('../controllers/driverCtrl')
 
 
 // Driver Auth Routes
@@ -31,6 +32,8 @@ router.route('/').get(authenticateToken, getAllDrivers)
 router.route('/:id').get(authenticateToken, getDriver)
                      .patch(authenticateToken, updateDriver)
                      .delete(authenticateToken, deleteDriver)
+router.route('/viewRides/:id').get(authenticateToken, viewRides)
+
 router.route('/upload-details/:id').patch(authenticateToken, 
                                           upload.fields([
                                                  { name: "image", maxCount: 1 },

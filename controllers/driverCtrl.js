@@ -16,6 +16,14 @@ const getDriver = async (req,res) => {
     res.status(200).json({driver})
 }
 
+const viewRides = async(req,res) =>{
+    const {id:driverId} = req.params
+    const driver = await Driver.findById(driverId).populate('assignedBookings', 'id child pick_up_location drop_off_location ride_type trip_type pick_up_time')
+    if(!driver) res.status(404).json("Driver not Found")
+
+    res.status(200).json({driver})
+}
+
 const uploadDriverDetails = async (req, res) => {
     try {
         if (!req.files || Object.keys(req.files).length === 0) {
@@ -48,7 +56,7 @@ const uploadDriverDetails = async (req, res) => {
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
-};
+}
 
 const updateDriver = async (req, res) => {
     try {
@@ -92,5 +100,6 @@ module.exports = {
     getDriver,
     updateDriver,
     deleteDriver,
+    viewRides,
     uploadDriverDetails
 }
