@@ -47,9 +47,10 @@ const DriverSchema = new Schema({
     },
     status: {
         type: String,
-        enum: ['driving', 'unavailable', 'online' ,'assigned', 'completed', 'cancelled'],
+        enum: ['driving', 'unavailable', 'online' ,'assigned', 'unassigned' , 'completed', 'cancelled'],
         default: 'unavailable',
     },
+    assignedBookings: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Bookings' }],
     start_latitude: String,
     start_longitude: String,
     end_latitude: String,
