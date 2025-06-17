@@ -6,7 +6,7 @@ const uploadToCloudinary = require('../cloudinary/uploadCloudinary')
 // Add/Register a Child
 
 const addChild = async (req, res) => {
-    const { fullname, age, grade, school, address, relationship } = req.body;
+    const { fullname, age, grade,relationship, school, home_address, school_address, daycare_address} = req.body;
     
     if (!req.user || !req.user.userId) {
         return res.status(401).json({ message: 'User not authenticated' });
@@ -31,9 +31,11 @@ const addChild = async (req, res) => {
             image: imageUrl,
             age,
             grade,
-            school,
-            address,
             relationship,
+            school,
+            home_address,
+            school_address,
+            daycare_address: daycare_address?.trim() || undefined,
             user: userId
         });
 
