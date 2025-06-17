@@ -2,52 +2,31 @@ const { Model } = require('mongoose')
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY)
 const Book = require('../models/Book')
 const Child = require('../models/Child')
-
 // Enums
+const { RideType, TripType, ScheduleType, BookingStatus, DaysOfWeek} = require('../utils/bookingEnum')
 
-const RideType = {
-    FREELANCE: 'freelance',
-    INHOUSE: 'inhouse',
-};
-
-const TripType = {
-    RETURN: 'return',
-    ONE_WAY: 'one-way',
-};
-
-const ScheduleType = {
-    TWO_WEEKS: '2 weeks',
-    ONE_MONTH: '1 month',
-};
-
-const BookingStatus = {
-    BOOKED: 'booked',
-    ONGOING: 'ongoing',
-    PAID:'paid',
-    ASSIGNED: 'assigned',
-    FAILED: 'payment_failed',
-    COMPLETED: 'completed',
-    CANCELLED: 'cancelled',
-};
 
 // Book ride
 const bookRide = async (req, res) => {
     const {id: childId} = req.params
 
     const {
-        pick_up_location,
-        drop_off_location,
         ride_type,
         trip_type,
-        schedule,
+        schedule_type,
+        number_of_days,
+        pickup_days,
         start_date,
-        pick_up_time,
-        drop_off_time,
+        morning_from,
+        morning_to,
+        morning_time,
+        afternoon_from,
+        afternoon_to,
+        afternoon_time,
         start_latitude,
         start_longitude,
         end_latitude,
-        end_longitude,
-        
+        end_longitude
     } = req.body;
 
     try {
@@ -58,8 +37,31 @@ const bookRide = async (req, res) => {
         if (!Object.values(TripType).includes(trip_type)) {
             return res.status(400).json({ message: 'Invalid trip type. Valid values are: return, one-way.' });
         }
-        if (!Object.values(ScheduleType).includes(schedule)) {
-            return res.status(400).json({ message: 'Invalid schedule type. Valid values are: 2 weeks, 1 month.' });
+        if (!Object.values(ScheduleType).includes(schedule_type)) {
+            return res.status(400).json({ message: 'Invalid schedule type. Valid values are: 2 weeks, 1 month, custom.' });
+        }
+
+        // Check to make sure only when schedule is custom can number of days be entered
+
+        if (schedule_type === 'custom') {
+            if (!number_of_days || number_of_days <= 0) {
+                return res.status(400).json({
+                message: 'number_of_days is required and must be greater than 0 when schedule_type is custom.',
+                });
+            }
+        } else {
+            if (number_of_days !== undefined) {
+                return res.status(400).json({
+                message: 'number_of_days should only be provided when schedule_type is custom.',
+                });
+            }
+        }
+
+        const isValidDays = Array.isArray(pickup_days) && pickup_days.every(day => 
+            Object.values(DaysOfWeek).includes(day))
+
+        if (!isValidDays) {
+            return res.status(400).json({ message: 'Invalid pickup days. Valid values are: Sunday to Saturday.' });
         }
 
         // Check if the child belongs to the user
@@ -72,23 +74,43 @@ const bookRide = async (req, res) => {
         const existing = await Book.findOne({ child: childId, status: BookingStatus.BOOKED });
         if (existing) return res.status(400).json({ message: "A pending booking already exists for this child" });
 
+        // Get mapped addresses from child based on selections
+        const getAddress = (label) => {
+            if (label === 'home') return childRecord.home_address;
+            if (label === 'school') return childRecord.school_address;
+            if (label === 'daycare') return childRecord.daycare_address;
+            return null;
+        }
+
         // Create booking
         const booking = new Book({
-            pick_up_location,
-            drop_off_location,
             ride_type,
             trip_type,
-            schedule,
+            schedule_type,
+            number_of_days,
+            pickup_days,
             start_date,
-            pick_up_time,
-            drop_off_time,
-            status: BookingStatus.BOOKED,
-            user: req.user.userId,
-            child: childId,
+
+            morning_from,
+            morning_to,
+            morning_time,
+            morning_from_address: getAddress(morning_from),
+            morning_to_address: getAddress(morning_to),
+
+            afternoon_from,
+            afternoon_to,
+            afternoon_time,
+            afternoon_from_address: getAddress(afternoon_from),
+            afternoon_to_address: getAddress(afternoon_to),
+            
             start_latitude,
             start_longitude,
             end_latitude,
-            end_longitude
+            end_longitude,
+
+            user: req.user.userId,
+            child: childId,
+            status: BookingStatus.BOOKED
         });
         
         await booking.save();
@@ -166,7 +188,8 @@ const getRidesByUser = async (req, res) => {
     const userId = req.user.userId
 
     try {
-        const rides = await Book.find({ user: userId }).populate('child')
+        const rides = await Book.find({ user: userId })
+            .populate('child', 'fullname image grade age trip_type school')
         res.status(200).json({ rides })
     } catch (err) {
         res.status(500).json({message: 'Error getting Rides', error: err.message })
@@ -196,7 +219,7 @@ const getAllRides = async (req, res) => {
     try {
         const rides = await Book.find({})
             .populate('user', 'fullname address phone_number') // Fetch specific fields from users
-            .populate('child', 'name image grade school') // Fetch specific fields from child
+            .populate('child', 'fullname image grade age trip_type school') // Fetch specific fields from child
             .populate('driver', 'fullname image status') // Fetch specific fields from drivers
 
         res.status(200).json({ rides });
@@ -224,7 +247,7 @@ const getRecentRides = async (req, res) => {
         const bookings = await Book.find({ child: childId })
             .sort({ createdAt: -1 })
             .populate('user', 'fullname email phone_number address')
-            .populate('child', 'fullname school address grade age')
+            .populate('child', 'fullname image grade age trip_type school')
             .populate('driver', 'fullname image status ')
     
         res.status(200).json({ bookings });
@@ -232,7 +255,6 @@ const getRecentRides = async (req, res) => {
         res.status(500).json({ message: 'Failed to fetch bookings', error: error.message })
     }
 };
-
 
 // get rides by status
 const getRidesByStatus = async (req, res) => {
