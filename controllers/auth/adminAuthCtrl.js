@@ -79,7 +79,7 @@ const loginAdmin = async (req, res) => {
         const token = jwt.sign(
             { adminId: admin._id, email: admin.email },
             process.env.JWT_SECRET,
-            { expiresIn: '10m' }
+            { expiresIn: '5d' }
         );
 
         res.status(200).json({
