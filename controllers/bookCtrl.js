@@ -125,63 +125,79 @@ const bookRide = async (req, res) => {
     }
 }
 
-// Make Payment (still in works 80% ready)
+// Make Payment (still in works)
 const makePayment = async (req, res) => {
-    const { bookingId, paymentMethodId, amount, currency } = req.body;
-  
-    // Validate currency
+    const { bookingId, paymentMethodId, currency } = req.body;
+
     if (!['usd', 'cad'].includes(currency)) {
-      return res.status(400).json({ message: 'Invalid currency. Only USD and CAD are supported.' });
+        return res.status(400).json({ message: 'Invalid currency. Only USD and CAD are supported.' });
     }
-  
+
     try {
         const booking = await Book.findById(bookingId);
-        if (!booking) {
-            return res.status(404).json({ message: 'Booking not found' });
+        if (!booking) return res.status(404).json({ message: 'Booking not found' });
+
+        if (booking.user.toString() !== req.user.userId)
+            return res.status(403).json({ message: 'Unauthorized access' });
+
+        if (![BookingStatus.BOOKED, BookingStatus.FAILED].includes(booking.status))
+            return res.status(400).json({ message: 'Booking is not eligible for payment' });
+
+        // Rates
+        const DAILY_RATE = process.env.DAILY_RATE;
+        const BI_WEEKLY_RATE = process.env.BI_WEEKLY_RATE;
+        const MONTHLY_RATE = process.env.MONTHLY_RATE;
+
+        let calculatedAmount = 0;
+
+        switch (booking.schedule_type) {
+            case 'custom':
+                if (!booking.number_of_days || booking.number_of_days <= 0) {
+                    return res.status(400).json({ message: 'Invalid number of days for custom schedule' });
+                }
+                calculatedAmount = DAILY_RATE * booking.number_of_days;
+                break;
+
+            case '2 weeks':
+                calculatedAmount = BI_WEEKLY_RATE;
+                break;
+
+            case '1 month':
+                calculatedAmount = MONTHLY_RATE;
+                break;
+
+            default:
+                return res.status(400).json({ message: 'Invalid schedule type' });
         }
-    
-        // Check if user is the owner of the booking
-        if (booking.user.toString() !== req.user.userId) {
-            return res.status(403).json({ message: 'Unauthorized access to booking' });
-        }
-    
-        // Only allow payment if status is BOOKED or FAILED
-        if (![BookingStatus.BOOKED, BookingStatus.FAILED].includes(booking.status)) {
-            return res.status(400).json({ message: 'Payment not allowed for this booking status' });
-        }
-    
-        // Convert amount to cents
-        const amountInCents = Math.round(amount * 100);
-    
-        // Create PaymentIntent
+
+        const amountInCents = Math.round(calculatedAmount * 100);
+
         const paymentIntent = await stripe.paymentIntents.create({
             amount: amountInCents,
             currency,
             payment_method: paymentMethodId,
             confirm: true,
-            automatic_payment_methods: {
-                enabled: true,
-                allow_redirects: 'never',
+            metadata: {
+                bookingId: bookingId,
+                userId: req.user.userId,
             },
-        })
-    
-        // Payment succeeded — update booking status
-        await Book.findByIdAndUpdate(bookingId, { status: BookingStatus.PAID })
-    
+        });
+
         res.status(200).json({
-            message: 'Payment successful. A driver will be assigned shortly.',
+            message: 'Payment processing started.',
             client_secret: paymentIntent.client_secret,
         });
+
     } catch (error) {
-        // Payment failed — update status to FAILED
         await Book.findByIdAndUpdate(bookingId, { status: BookingStatus.FAILED });
-    
         res.status(500).json({
-            message: 'Payment failed. Please try again shortly.',
+            message: 'Payment failed. Please try again later.',
             error: error.message,
-        })
+        });
     }
-}
+};
+
+
 
 // find all rides created by the user
 const getRidesByUser = async (req, res) => {
@@ -220,7 +236,8 @@ const getAllRides = async (req, res) => {
         const rides = await Book.find({})
             .populate('user', 'fullname address phone_number') // Fetch specific fields from users
             .populate('child', 'fullname image grade age trip_type school') // Fetch specific fields from child
-            .populate('driver', 'fullname image status') // Fetch specific fields from drivers
+            .populate('drivers', 'fullname image status') // Fetch specific fields from drivers
+
 
         res.status(200).json({ rides });
     } catch (error) {
@@ -248,7 +265,7 @@ const getRecentRides = async (req, res) => {
             .sort({ createdAt: -1 })
             .populate('user', 'fullname email phone_number address')
             .populate('child', 'fullname image grade age trip_type school')
-            .populate('driver', 'fullname image status ')
+            .populate('drivers', 'fullname image status ')
     
         res.status(200).json({ bookings });
     } catch (error) {
