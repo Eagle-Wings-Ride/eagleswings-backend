@@ -1,6 +1,11 @@
 const express = require('express')
 const cors = require('cors')
 const app = express()
+const stripeWebhook = require('./utils/webhook') 
+
+// Webhook
+app.post('/webhook', express.raw({ type: 'application/json' }), stripeWebhook)
+
 const users = require('./routes/user')
 const driver = require('./routes/driver')
 const booking = require('./routes/bookings')
