@@ -12,6 +12,8 @@ const {registerDriver,
 
 const {getAllDrivers,
        getDriver,
+       driverAcceptRide,
+       driverRejectRide,
        updateDriver,
        deleteDriver,
        uploadDriverDetails,
@@ -27,12 +29,15 @@ router.route('/login').post(loginDriver)
 router.route('/logout').post(authenticateToken, logoutDriver)
 
 // router.route('/forgot-password').post(authenticateToken, generateOTPAndExpiry,forgotPassword)
+
 // Driver Other Routes
 router.route('/').get(authenticateToken, getAllDrivers)
+router.route('/viewRides').get(authenticateToken, viewRides)
 router.route('/:id').get(authenticateToken, getDriver)
                      .patch(authenticateToken, updateDriver)
                      .delete(authenticateToken, deleteDriver)
-router.route('/viewRides/:id').get(authenticateToken, viewRides)
+router.route('/:assignmentId/accept').patch(authenticateToken, driverAcceptRide)
+router.route('/:assignmentId/reject').patch(authenticateToken, driverRejectRide)
 
 router.route('/upload-details/:id').patch(authenticateToken, 
                                           upload.fields([
