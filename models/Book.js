@@ -85,12 +85,13 @@ const BookSchema = new Schema({
  
     status: {
       type: String,
-      enum: ['booked', 'paid', 'assigned', 'ongoing', 'payment_failed', 'completed', 'cancelled'],
+      enum: ['booked', 'paid', 'assigned', 'ongoing', 'payment_failed', 'completed', 'cancelled', 'expired'],
       default: 'booked',
     },
     cancellationReason: String,
     cancellationDate: Date,
   
+    // Relations
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
@@ -101,16 +102,19 @@ const BookSchema = new Schema({
       ref: 'Child',
       required: true,
     },
-    drivers: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Driver',
-      },
-    ],
     createdAt: {
       type: Date,
       default: Date.now,
     },
+    serviceEndDate: {
+      type: Date,
+      required: false,
+    },
+    reminderSent: {
+      type: Boolean,
+      default: false,
+    }
+    
   })
 
 
