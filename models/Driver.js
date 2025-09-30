@@ -4,23 +4,23 @@ const bcrypt = require('bcryptjs');
 
 
 const DriverSchema = new Schema({
-    fullname : {
+    fullname: {
         type: String,
         required: [true, 'Please provide a name'],
         minlength: 3,
         maxlength: 50
     },
-    email : {
+    email: {
         type: String,
         unique: true,
-        required : [true, 'Please provide Email']
+        required: [true, 'Please provide Email']
     },
     password: {
         type: String,
         required: [true, 'Please provide password'],
         minlength: [6, 'password length too short'],
     },
-    phone_number : {
+    phone_number: {
         type: String,
         unique: true
     },
@@ -32,11 +32,15 @@ const DriverSchema = new Schema({
     residential_address: String,
     preferred_route: String,
     reasons: String,
-    car_insurance : String,
-    driver_license : String,
-    criminal_check_rec : String,
-    child_intervention_rec : String,
-    driver_abstract : String,
+
+    // Verification / credentials
+    car_insurance: String,
+    driver_license: String,
+    criminal_check_rec: String,
+    child_intervention_rec: String,
+    driver_abstract: String,
+
+    // Verification status
     isEmailVerified: {
         type: Boolean,
         default: false
@@ -45,24 +49,36 @@ const DriverSchema = new Schema({
         type: Boolean,
         default: false
     },
+
+    // Current availability status (not per ride)
     status: {
         type: String,
-        enum: ['driving', 'unavailable', 'online' ,'assigned', 'unassigned' , 'completed', 'cancelled'],
+        enum: ['driving', 'unavailable', 'online', 'offline'],
         default: 'unavailable',
     },
-    assignedBookings: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Bookings' }],
-    start_latitude: String,
-    start_longitude: String,
-    end_latitude: String,
-    end_longitude:String,
+
+    // Live location for tracking
+    current_latitude: Number,
+    current_longitude: Number,
+
+    // Optional start/end points (for ride assignment)
+    start_latitude: Number,
+    start_longitude: Number,
+    end_latitude: Number,
+    end_longitude: Number,
+
     otp: String,
     otpExpiry: Date,
 
+    // Notifications
+    fcmTokens: { type: [String], default: [] },
+
     createdAt: {
         type: Date,
-        default: Date.now() 
+        default: Date.now
     }
-})
+});
+
 
 DriverSchema.pre('save', async function () {
     if (!this.isModified('password')) return;
@@ -70,8 +86,8 @@ DriverSchema.pre('save', async function () {
     this.password = await bcrypt.hash(this.password, salt);
 });
 
-DriverSchema.methods.comparePassword = async function (canditatePassword) {
-    const isMatch = await bcrypt.compare(canditatePassword, this.password);
+DriverSchema.methods.comparePassword = async function (candidatePassword) {
+    const isMatch = await bcrypt.compare(candidatePassword, this.password);
     return isMatch;
 };
 

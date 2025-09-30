@@ -32,6 +32,7 @@ const UserSchema = new Schema({
     },
     otp: String,
     otpExpiry: Date,
+    fcmTokens: { type: [String], default: [] },
     createdAt: {
       type: Date,
       default: Date.now() 
@@ -45,8 +46,8 @@ const UserSchema = new Schema({
     this.password = await bcrypt.hash(this.password, salt);
   });
   
-  UserSchema.methods.comparePassword = async function (canditatePassword) {
-    const isMatch = await bcrypt.compare(canditatePassword, this.password);
+  UserSchema.methods.comparePassword = async function (candidatePassword) {
+    const isMatch = await bcrypt.compare(candidatePassword, this.password);
     return isMatch;
   };
 
