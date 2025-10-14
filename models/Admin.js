@@ -26,6 +26,19 @@ const AdminSchema = new Schema({
     },
     otp: String,
     otpExpiry: Date,
+
+    status: {
+      type: String,
+      enum: ['active', 'suspended'],
+      default: 'active',
+    },
+    role: {
+      type: String,
+      enum: ['superadmin', 'admin'],
+      default: 'admin',
+    },
+
+    fcmTokens: { type: [String], default: [] },
     createdAt: {
       type: Date,
       default: Date.now() 
@@ -39,8 +52,8 @@ const AdminSchema = new Schema({
     this.password = await bcrypt.hash(this.password, salt);
   });
   
-  AdminSchema.methods.comparePassword = async function (canditatePassword) {
-    const isMatch = await bcrypt.compare(canditatePassword, this.password);
+  AdminSchema.methods.comparePassword = async function (candidatePassword) {
+    const isMatch = await bcrypt.compare(candidatePassword, this.password);
     return isMatch;
   };
 

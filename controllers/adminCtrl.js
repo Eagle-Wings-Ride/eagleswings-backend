@@ -1,14 +1,22 @@
 const Admin = require('../models/Admin')
 const Driver = require('../models/Driver')
 const Book = require('../models/Book')
+const Assignment = require('../models/Assignment')
+const { sendToTokens } = require('../utils/pushNotifications')
 
+// Approve Drivevr after Vetting
 const approveDriver = async (req, res) => {
     const { id: driverId } = req.params
     const { is_approved } = req.body
-    const adminId = req.user?.adminId
+    const adminId = req.user.adminId
+    const role = req.user?.role;
 
     if (!adminId) {
         return res.status(401).json({ message: "Unauthorized: Admin ID missing" })
+    }
+
+    if (!['admin', 'superadmin'].includes(role)) {
+        return res.status(403).json({ message: "Forbidden: Only admin or superadmin can approve drivers" });
     }
 
     if (typeof is_approved !== 'boolean') {
@@ -38,132 +46,136 @@ const approveDriver = async (req, res) => {
 
 // Assign driver to the ride (booking)
 const assignDriverToRide = async (req, res) => {
-    const { driverId } = req.body
-    const { bookingId } = req.params
-    const adminId = req.user.adminId
-
-    if (!adminId) {
-        return res.status(401).json({ message: "Unauthorized: Admin ID missing" })
-    }
-
-    const admin = await Admin.findById(adminId)
-    if (!admin) {
-        return res.status(404).json({ message: "Admin not found" })
-    }
+    const { driverId, shift } = req.body;
+    const { bookingId } = req.params;
+    const adminId = req.user?.adminId;
 
     try {
-        const booking = await Book.findById(bookingId);
-        if (!booking) return res.status(404).json({ message: "Booking not found" })
+        // 🔒 Auth check
+        if (!adminId) {
+            return res.status(401).json({ message: "Unauthorized: Admin ID missing" });
+        }
+        const admin = await Admin.findById(adminId);
+        if (!admin) {
+            return res.status(404).json({ message: "Admin not found" });
+        }
 
+        // 🔎 Booking check
+        const booking = await Book.findById(bookingId);
+        if (!booking) {
+            return res.status(404).json({ message: "Booking not found" });
+        }
+        if (booking.status !== "paid") {
+            return res.status(400).json({ message: "Booking must be paid before assigning a driver" });
+        }
+
+        // 🔎 Driver check
         const driver = await Driver.findById(driverId);
         if (!driver) {
-            return res.status(404).json({ message: "Driver not found" })
-        } else if (!driver.isDriverApproved) {
-            return res.status(400).json({ message: "Driver hasn't been approved yet" })
+            return res.status(404).json({ message: "Driver not found" });
+        }
+        if (!driver.isDriverApproved) {
+            return res.status(400).json({ message: "Driver has not been approved yet" });
         }
 
-        // Prevent assigning more than 2 drivers
-        if (booking.drivers.length >= 2) {
-            return res.status(400).json({ message: "Maximum of 2 drivers already assigned to this ride" })
+        // ⏰ Shift validation
+        const validShifts = ["morning", "afternoon"];
+        if (shift && !validShifts.includes(shift)) {
+            return res.status(400).json({ message: "Invalid shift. Use 'morning' or 'afternoon'" });
+        }
+        // 🚫 Prevent duplicate driver assignment
+        const existingAssignment = await Assignment.findOne({ booking: bookingId, driver: driverId });
+        if (existingAssignment) {
+            return res.status(400).json({ message: "Driver already assigned to this ride" });
+        }
+        // 🚫 Prevent duplicate shift assignment
+        if (shift) {
+            const shiftTaken = await Assignment.findOne({ booking: bookingId, shift });
+            if (shiftTaken) {
+            return res.status(400).json({ message: `A driver is already assigned for ${shift} shift` });
+            }
         }
 
-        // Add driver to the list if not already there
-        const updatedBooking = await Book.findByIdAndUpdate(
-            bookingId,
-            {
-                $addToSet: { drivers: driverId },
-                status: 'assigned',
-            },
-            { new: true, runValidators: true }
-        )
+        // 🆕 Create new assignment
+        const assignment = await Assignment.create({
+            booking: bookingId,
+            driver: driverId,
+            assignedBy: adminId,
+            shift: shift || null,
+            status: "pending", // driver must accept
+        });
 
-        // Add booking to driver's assigned list
-        await Driver.findByIdAndUpdate(
-            driverId,
-            {
-                $addToSet: { assignedBookings: bookingId },
-                status: 'assigned' 
-            },
-            { new: true }
-        )
+        // 📲 Notify driver
+        if (driver.fcmTokens?.length > 0) {
+            await sendToTokens(
+            driver.fcmTokens,
+            "New Ride Assigned",
+            "You have a new ride request. Please accept it.",
+            { bookingId, driverId }
+            );
+        }
 
-        res.status(200).json({
-            message: 'Driver assigned successfully',
-            booking: updatedBooking
-        })
+        return res.status(200).json({
+            message: "Driver assignment created (pending driver response)",
+            assignment,
+        });
 
     } catch (error) {
-        res.status(500).json({
+        console.error("Error assigning driver:", error);
+        return res.status(500).json({
             message: "Error assigning driver",
-            error: error.message
-        })
+            error: error.message,
+        });
     }
-}
+};
+
 
 // Unassign Driver from ride
 const UnassignDriverFromRide = async (req, res) => {
-    const { driverId } = req.body
-    const { bookingId } = req.params
-    const adminId = req.user.adminId
+    const { driverId } = req.body;
+    const { bookingId } = req.params;
+    const adminId = req.user.adminId;
 
     if (!adminId) {
-        return res.status(401).json({ message: "Unauthorized: Admin ID missing" })
+        return res.status(401).json({ message: "Unauthorized: Admin ID missing" });
     }
 
     const admin = await Admin.findById(adminId);
     if (!admin) {
-        return res.status(404).json({ message: "Admin not found" })
+        return res.status(404).json({ message: "Admin not found" });
     }
 
     try {
-        const booking = await Book.findById(bookingId);
-        if (!booking) return res.status(404).json({ message: "Booking not found" })
+      // Find assignment
+        const assignment = await Assignment.findOneAndDelete({ booking: bookingId, driver: driverId })
 
-        const driver = await Driver.findById(driverId);
-        if (!driver) return res.status(404).json({ message: "Driver not found" })
-
-        // Check if driver is part of this ride
-        if (!booking.drivers.includes(driverId)) {
-            return res.status(400).json({ message: "This driver is not assigned to the selected booking" });
+        if (!assignment) {
+            return res.status(404).json({ message: "No assignment found for this driver and booking" })
         }
 
-        // Remove driver from the ride
-        const updatedBooking = await Book.findByIdAndUpdate(
-            bookingId,
-            {
-                $pull: { drivers: driverId },
-                status: booking.drivers.length <= 1 ? 'booked' : 'assigned'
-            },
-            { new: true }
-        )
-
-        // Remove booking from driver's assignedBookings
-        await Driver.findByIdAndUpdate(driverId, {
-            $pull: { assignedBookings: bookingId }
-        });
-
-        // If driver has no more rides, update status
-        const remainingRides = await Book.find({
-            drivers: driverId,
-            status: 'assigned'
-        })
-
-        if (remainingRides.length === 0) {
-            await Driver.findByIdAndUpdate(driverId, { status: 'unassigned' });
+      // Notify driver that they were unassigned
+        const driver = await Driver.findById(driverId);
+        if (driver?.fcmTokens?.length > 0) {
+            await sendToTokens(
+            driver.fcmTokens,
+            "Ride Unassigned",
+            "You have been unassigned from a ride by the admin.",
+            { bookingId, driverId }
+            )
         }
 
         res.status(200).json({
-            message: 'Driver unassigned successfully',
-            updatedBooking
+            message: "Driver unassigned successfully",
+            removedAssignment: assignment,
         })
-
     } catch (error) {
         res.status(500).json({
             message: "Error unassigning driver",
-            error: error.message
+            error: error.message,
         })
     }
 }
+
 
 // get driver by location (in progress)
 const getDriverByLocation = async (req, res) => {

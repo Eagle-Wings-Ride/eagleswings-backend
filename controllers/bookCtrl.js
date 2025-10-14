@@ -2,6 +2,11 @@ const { Model } = require('mongoose')
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY)
 const Book = require('../models/Book')
 const Child = require('../models/Child')
+const Admin = require('../models/Admin')
+const Assignment = require('../models/Assignment');
+const { sendToTokens } = require('../utils/pushNotifications')
+
+
 // Enums
 const { RideType, TripType, ScheduleType, BookingStatus, DaysOfWeek} = require('../utils/bookingEnum')
 
@@ -115,6 +120,19 @@ const bookRide = async (req, res) => {
         
         await booking.save();
 
+        // 🔔 Send notification to admins only
+        const admins = await Admin.find({fcmTokens: { $exists: true, $ne: [] } }).select('fcmTokens');
+        const adminTokens = admins.flatMap(a => a.fcmTokens);
+
+        if (adminTokens.length) {
+            await sendToTokens(
+                adminTokens,
+                'New Booking Created',
+                `A booking has been created for child ${childRecord.name}. Awaiting payment.`,
+                { bookingId: booking._id.toString() }
+            );
+        }
+
         res.status(201).json({
             message: 'Ride booked successfully, proceed to make payment',
             booking,
@@ -125,7 +143,7 @@ const bookRide = async (req, res) => {
     }
 }
 
-// Make Payment (still in works)
+// Make Payment
 const makePayment = async (req, res) => {
     const { bookingId, paymentMethodId, currency } = req.body;
 
@@ -172,14 +190,21 @@ const makePayment = async (req, res) => {
 
         const amountInCents = Math.round(calculatedAmount * 100);
 
+        // Create Stripe payment
         const paymentIntent = await stripe.paymentIntents.create({
             amount: amountInCents,
             currency,
             payment_method: paymentMethodId,
             confirm: true,
+            automatic_payment_methods: {
+                enabled: true,
+                allow_redirects: 'never'
+            },
             metadata: {
                 bookingId: bookingId,
                 userId: req.user.userId,
+                type: 'new'
+
             },
         });
 
@@ -197,83 +222,234 @@ const makePayment = async (req, res) => {
     }
 };
 
+// Renew Payment
+const renewBooking = async (req, res) => {
+    const { bookingId, paymentMethodId, currency } = req.body;
 
-
-// find all rides created by the user
-const getRidesByUser = async (req, res) => {
-    const userId = req.user.userId
+    if (!['usd', 'cad'].includes(currency)) {
+        return res.status(400).json({ message: 'Invalid currency. Only USD and CAD are supported.' });
+    }
 
     try {
-        const rides = await Book.find({ user: userId })
-            .populate('child', 'fullname image grade age trip_type school')
-        res.status(200).json({ rides })
-    } catch (err) {
-        res.status(500).json({message: 'Error getting Rides', error: err.message })
-    }
-}
+        const booking = await Book.findById(bookingId);
+        if (!booking) return res.status(404).json({ message: 'Booking not found' });
 
-// get all rides by children 
-const getRideByChild = async (req, res) => { 
-    const {childId} = req.params
+        if (booking.user.toString() !== req.user.userId)
+            return res.status(403).json({ message: 'Unauthorized access' });
 
-    try{
-        const booking = await Book.find({child: childId}).populate('child')
+        // Only allow renewal if serviceEndDate is within 3 days
+        const now = new Date();
+        const daysLeft = Math.ceil((booking.serviceEndDate - now) / (1000 * 60 * 60 * 24));
+        if (daysLeft > 3) return res.status(400).json({ message: 'Too early to renew' });
 
-        const isChildOwnedByUser = booking.every(booking => booking.user.toString() === req.user.userId.toString())
+        // Rates
+        const DAILY_RATE = process.env.DAILY_RATE;
+        const BI_WEEKLY_RATE = process.env.BI_WEEKLY_RATE;
+        const MONTHLY_RATE = process.env.MONTHLY_RATE;
+        let calculatedAmount = 0;
 
-        if (!isChildOwnedByUser) {
-            return res.status(403).json({ message: "Unauthorized: Child does not belong to this user" });
+        switch (booking.schedule_type) {
+            case 'custom':
+                if (!booking.number_of_days || booking.number_of_days <= 0) {
+                    return res.status(400).json({ message: 'Invalid number of days for custom schedule' });
+                }
+                calculatedAmount = DAILY_RATE * booking.number_of_days;
+                break;
+
+            case '2 weeks':
+                calculatedAmount = BI_WEEKLY_RATE;
+                break;
+
+            case '1 month':
+                calculatedAmount = MONTHLY_RATE;
+                break;
+
+            default:
+                return res.status(400).json({ message: 'Invalid schedule type' });
         }
-        res.status(200).json(booking)
-    }catch(err){
-        res.status(500).json({ message: "Failed to get Rides", error: err.message })
-    }
-}
 
-// get all rides
-const getAllRides = async (req, res) => {
-    try {
-        const rides = await Book.find({})
-            .populate('user', 'fullname address phone_number') // Fetch specific fields from users
-            .populate('child', 'fullname image grade age trip_type school') // Fetch specific fields from child
-            .populate('drivers', 'fullname image status') // Fetch specific fields from drivers
+        const amountInCents = Math.round(calculatedAmount * 100);
 
+        // Create Stripe payment
+        const paymentIntent = await stripe.paymentIntents.create({
+            amount: amountInCents,
+            currency,
+            payment_method: paymentMethodId,
+            confirm: true,
+            metadata: {
+                bookingId: bookingId,
+                userId: req.user.userId,
+                type: 'renewal'
+            },
+        });
 
-        res.status(200).json({ rides });
+        res.status(200).json({
+            message: ' Renewal payment processing started.',
+            client_secret: paymentIntent.client_secret,
+        });
+
     } catch (error) {
-        res.status(500).json({ message: 'Error fetching rides', error: error.message });
-    }
-}
-
-// get recent rides
-const getRecentRides = async (req, res) => {
-    try {
-        const {childId} = req.params
-        const authenticatedUserId = req.user.userId
-
-        if (!childId) {
-            return res.status(400).json({ message: 'Child not found' })
-        }
-
-        const child = await Child.findOne({ _id: childId, user: authenticatedUserId })
-
-        if (!child) {
-            return res.status(403).json({ message: 'Child not found or registered under this user' })
-        }
-
-        const bookings = await Book.find({ child: childId })
-            .sort({ createdAt: -1 })
-            .populate('user', 'fullname email phone_number address')
-            .populate('child', 'fullname image grade age trip_type school')
-            .populate('drivers', 'fullname image status ')
-    
-        res.status(200).json({ bookings });
-    } catch (error) {
-        res.status(500).json({ message: 'Failed to fetch bookings', error: error.message })
+        await Book.findByIdAndUpdate(bookingId, { status: BookingStatus.FAILED });
+        res.status(500).json({
+            message: 'Payment failed. Please try again later.',
+            error: error.message,
+        });
     }
 };
 
-// get rides by status
+// find all rides created by the user
+const getRidesByUser = async (req, res) => {
+    const userId = req.user.userId;
+    
+    try {
+        // Get rides
+        const rides = await Book.find({ user: userId })
+        .populate('child', 'fullname image grade age trip_type school');
+        
+        // Fetch assignments for all rides
+        const rideIds = rides.map(r => r._id);
+        const assignments = await Assignment.find({ booking: { $in: rideIds } })
+        .populate('driver', 'fullname image status');
+
+        // Map drivers into rides
+        const ridesWithDrivers = rides.map(ride => {
+        const drivers = assignments
+            .filter(a => a.booking.toString() === ride._id.toString())
+            .map(a => a.driver);
+        return { ...ride.toObject(), drivers };
+        });
+
+        res.status(200).json({ rides: ridesWithDrivers });
+    } catch (err) {
+        res.status(500).json({ message: 'Error getting rides', error: err.message });
+    }
+};
+
+// get all rides by children 
+const getRideByChild = async (req, res) => { 
+        const { childId } = req.params;
+    
+        try {
+        const bookings = await Book.find({ child: childId })
+            .populate('child', 'fullname image grade age trip_type school');
+    
+        const isChildOwnedByUser = bookings.every(b => b.user.toString() === req.user.userId.toString());
+        if (!isChildOwnedByUser) return res.status(403).json({ message: "Unauthorized: Child does not belong to this user" });
+    
+        // Get assignments for these bookings
+        const bookingIds = bookings.map(b => b._id);
+        const assignments = await Assignment.find({ booking: { $in: bookingIds } })
+            .populate('driver', 'fullname image status');
+    
+        // Attach drivers
+        const bookingsWithDrivers = bookings.map(b => {
+            const drivers = assignments.filter(a => a.booking.toString() === b._id.toString())
+                                    .map(a => a.driver);
+            return { ...b.toObject(), drivers };
+        });
+    
+        res.status(200).json(bookingsWithDrivers);
+        } catch (err) {
+        res.status(500).json({ message: "Failed to get rides", error: err.message });
+        }
+    };
+
+// get all rides
+const getAllRides = async (req, res) => {
+        try {
+        const rides = await Book.find({})
+            .populate('user', 'fullname address phone_number')
+            .populate('child', 'fullname image grade age trip_type school');
+    
+        // Get all assignments
+        const rideIds = rides.map(r => r._id);
+        const assignments = await Assignment.find({ booking: { $in: rideIds } })
+            .populate('driver', 'fullname image status');
+    
+        // Merge drivers into rides
+        const ridesWithDrivers = rides.map(ride => {
+            const drivers = assignments.filter(a => a.booking.toString() === ride._id.toString())
+                                    .map(a => a.driver);
+            return { ...ride.toObject(), drivers };
+        });
+    
+        res.status(200).json({ rides: ridesWithDrivers });
+        } catch (err) {
+        res.status(500).json({ message: 'Error fetching rides', error: err.message });
+        }
+    };
+
+//Get all Users with paid rides 
+const getAllPaidUsers = async (req, res) => {
+    try {
+        // 1️⃣ Get all paid bookings
+        const rides = await Book.find({ status: "paid" })
+            .populate('user', 'fullname address phone_number')
+            .populate('child', 'fullname image grade age trip_type school');
+
+        // 2️⃣ Get all assignments related to these rides
+        const rideIds = rides.map(r => r._id);
+        const assignments = await Assignment.find({ booking: { $in: rideIds } })
+            .populate('driver', 'fullname image status');
+
+        // 3️⃣ Merge drivers into rides
+        const ridesWithDrivers = rides.map(ride => {
+            const drivers = assignments
+                .filter(a => a.booking.toString() === ride._id.toString())
+                .map(a => a.driver);
+            return { ...ride.toObject(), drivers };
+        });
+
+        // 4️⃣ Get unique users (avoid duplicates if multiple bookings)
+        const users = rides.map(r => r.user);
+        const uniqueUsers = Array.from(new Set(users.map(u => u._id.toString())))
+                                 .map(id => users.find(u => u._id.toString() === id));
+
+        // 5️⃣ Send response
+        res.status(200).json({ rides: ridesWithDrivers, users: uniqueUsers });
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Error fetching paid users", error: err.message });
+    }
+};
+
+// Get recent rides for a child, including assigned drivers
+const getRecentRides = async (req, res) => {
+        try {
+        const { childId } = req.params;
+        const userId = req.user.userId;
+    
+        if (!childId) return res.status(400).json({ message: 'Child not found' });
+    
+        const child = await Child.findOne({ _id: childId, user: userId });
+        if (!child) return res.status(403).json({ message: 'Child not registered under this user' });
+    
+        const bookings = await Book.find({ child: childId })
+            .sort({ createdAt: -1 })
+            .populate('user', 'fullname email phone_number address')
+            .populate('child', 'fullname image grade age trip_type school');
+    
+        // Fetch assignments for these bookings
+        const bookingIds = bookings.map(b => b._id);
+        const assignments = await Assignment.find({ booking: { $in: bookingIds } })
+            .populate('driver', 'fullname image status');
+    
+        // Map drivers into bookings
+        const bookingsWithDrivers = bookings.map(b => {
+            const drivers = assignments
+            .filter(a => a.booking.toString() === b._id.toString())
+            .map(a => a.driver);
+            return { ...b.toObject(), drivers };
+        });
+    
+        res.status(200).json({ bookings: bookingsWithDrivers });
+        } catch (error) {
+        res.status(500).json({ message: 'Failed to fetch bookings', error: error.message });
+        }
+  };
+
+// Get rides by status
 const getRidesByStatus = async (req, res) => {
     try {
         const { childId, status } = req.params
@@ -357,9 +533,11 @@ const updateRideStatus = async (req, res) => {
 module.exports = {
     bookRide,
     makePayment,
+    renewBooking,
     getRidesByUser,
     getRideByChild,
     getAllRides,
+    getAllPaidUsers,
     getRecentRides,
     getRidesByStatus,
     updateRideStatus
