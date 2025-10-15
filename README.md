@@ -95,7 +95,7 @@ npm start
 Ensure .env and database is connected correctly set up before running.
 
 🌐 Deployment
-Backend Hosted On: Vercel
+Backend Hosted On: Railway
 
 Can be consumed by mobile or web frontend clients via public API.
 
