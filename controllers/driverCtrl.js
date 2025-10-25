@@ -8,7 +8,7 @@ const {sendToTokens } = require('../utils/pushNotifications');
 
 const getAllDrivers = async (req, res) => {
     try {
-        const drivers = await Driver.find({});
+        const drivers = await Driver.find({}, '-password -fcmTokens');
         res.status(200).json(drivers);
     } catch (error) {
         res.status(500).json({ message: "Error fetching drivers", error: error.message });
@@ -25,7 +25,24 @@ const getDriver = async (req, res) => {
             return res.status(404).json({ message: "Driver not found" });
         }
 
-        res.status(200).json({ driver });
+        res.status(200).json({
+            driver:{
+                id: driver._id,
+                fullname: driver.fullname,
+                email: driver.email,
+                phone_number: driver.phone_number,
+                residential_address: driver.aresidential_ddress,
+                isEmailVerified: driver.isEmailVerified,
+                isDriverApproved: driver.isDriverApproved,
+                status: driver.status,
+                image: driver.image,
+                car_insurance: driver.car_insurance,
+                child_intervention_rec: driver.child_intervention_rec,
+                criminal_check_rec: driver.criminal_check_rec,
+                driver_abstract: driver.driver_abstract,
+                createdAt: driver.createdAt
+          } 
+        });
     } catch (error) {
         res.status(500).json({ message: "Error fetching driver", error: error.message });
     }
