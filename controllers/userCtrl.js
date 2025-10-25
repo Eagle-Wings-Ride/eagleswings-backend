@@ -9,11 +9,23 @@ const getUser = async (req, res) => {
         return res.status(404).json(" User Not Found")
     }
 
-    res.status(200).json({user})
+    res.status(200).json({
+          user:{
+            id: user._id,
+            fullname: user.fullname,
+            email: user.email,
+            phone_number: user.phone_number,
+            address: user.address,
+            isVerified: user.isVerified,
+            createdAt: user.createdAt
+          }
+        })
 }
 
 const getAllUsers = async (req, res) => {
-    const users = await User.find({})
+    const users = await User.find({}, '-password -fcmTokens')
+    console.log(users);
+
     res.status(200).json({users})
 }
 
