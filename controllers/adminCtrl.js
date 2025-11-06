@@ -4,7 +4,7 @@ const Book = require('../models/Book')
 const Assignment = require('../models/Assignment')
 const { sendToTokens } = require('../utils/pushNotifications')
 
-// Approve Drivevr after Vetting
+// Approve Driver after Vetting
 const approveDriver = async (req, res) => {
     const { id: driverId } = req.params
     const { is_approved } = req.body
