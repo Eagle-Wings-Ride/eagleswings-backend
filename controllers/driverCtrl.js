@@ -246,7 +246,14 @@ const uploadDriverDetails = async (req, res) => {
 
         for (const key in req.files) {
             const file = req.files[key][0];
-            const uploadedFile = await uploadToCloudinary(file, 'drivers');
+
+            if(!file || file.size == 0) continue;
+
+            // Build a readable but safe filename (e.g., 64a9..._license.jpg)
+            const fileExt = path.extname(file.originalname);
+            const safeName = `${driver._id}_${key}${fileExt}`;
+
+            const uploadedFile = await uploadToCloudinary(file, 'drivers', safeName);
             updatedFields[key] = uploadedFile.url;
         }
 
