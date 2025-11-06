@@ -38,19 +38,20 @@ const getRate = async (req, res) => {
 
 //  Update Rate
 const updateRate = async (req, res) => {
-    try {
-      const rate = await Rates.findOne();
-      if (!rate) {
-        return res.status(404).json({ message: 'Rate not found. Please create one first.' });
-      }
-  
-      // Update the rate document with the new data
-      const updatedRate = await Rates.findOneAndUpdate({}, req.body, { new: true });
-      res.status(200).json(updatedRate);
-    } catch (err) {
-      res.status(500).json({ message: 'Error updating rate', error: err.message });
+  try {
+    const updatedRate = await Rates.findOneAndUpdate({}, req.body, {
+      new: true,
+      runValidators: true
+    });
+    if (!updatedRate) {
+      return res.status(404).json({ message: 'Rate not found. Please create one first.' });
     }
-  };
+    res.status(200).json(updatedRate);
+  } catch (err) {
+    res.status(500).json({ message: 'Error updating rate', error: err.message });
+  }
+};
+
 
 
 //   Delete Rate
