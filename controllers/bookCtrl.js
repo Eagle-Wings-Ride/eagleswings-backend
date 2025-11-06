@@ -3,6 +3,7 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY)
 const Book = require('../models/Book')
 const Child = require('../models/Child')
 const Admin = require('../models/Admin')
+const Rates = require('../models/Rate')
 const Assignment = require('../models/Assignment');
 const { sendToTokens } = require('../utils/pushNotifications')
 
@@ -156,64 +157,70 @@ const makePayment = async (req, res) => {
         if (!booking) return res.status(404).json({ message: 'Booking not found' });
 
         if (booking.user.toString() !== req.user.userId)
-            return res.status(403).json({ message: 'Unauthorized access' });
+        return res.status(403).json({ message: 'Unauthorized access' });
 
         if (![BookingStatus.BOOKED, BookingStatus.FAILED].includes(booking.status))
-            return res.status(400).json({ message: 'Booking is not eligible for payment' });
+        return res.status(400).json({ message: 'Booking is not eligible for payment' });
 
-        // Rates
-        const DAILY_RATE = process.env.DAILY_RATE;
-        const BI_WEEKLY_RATE = process.env.BI_WEEKLY_RATE;
-        const MONTHLY_RATE = process.env.MONTHLY_RATE;
+        // ✅ Fetch latest rates from DB
+        const rate = await Rates.findOne();
+        if (!rate) return res.status(404).json({ message: 'Rate not configured yet.' });
 
+        // ✅ Determine rate category (in-house or freelance)
+        const driverRates =
+        booking.ride_type === 'inhouse'
+            ? rate.in_house_drivers
+            : rate.freelance_drivers;
+
+        // ✅ Determine which rate group to use (daily, bi_weekly, monthly)
         let calculatedAmount = 0;
 
-        switch (booking.schedule_type) {
-            case 'custom':
-                if (!booking.number_of_days || booking.number_of_days <= 0) {
-                    return res.status(400).json({ message: 'Invalid number of days for custom schedule' });
-                }
-                calculatedAmount = DAILY_RATE * booking.number_of_days;
-                break;
+        if (booking.schedule_type === 'custom') {
+        // Use daily rate multiplied by number of days
+        if (!booking.number_of_days || booking.number_of_days <= 0) {
+            return res.status(400).json({ message: 'Invalid number of days for custom schedule' });
+        }
+        calculatedAmount =
+            driverRates.daily[booking.trip_type] * booking.number_of_days;
+        } else {
+        // Map booking.schedule_type to model keys
+        const scheduleKey =
+            booking.schedule_type === '2 weeks'
+            ? 'bi_weekly'
+            : booking.schedule_type === '1 month'
+            ? 'monthly'
+            : null;
 
-            case '2 weeks':
-                calculatedAmount = BI_WEEKLY_RATE;
-                break;
-
-            case '1 month':
-                calculatedAmount = MONTHLY_RATE;
-                break;
-
-            default:
-                return res.status(400).json({ message: 'Invalid schedule type' });
+        if (!scheduleKey) {
+            return res.status(400).json({ message: 'Invalid schedule type' });
         }
 
+        calculatedAmount = driverRates[scheduleKey][booking.trip_type];
+        }
+
+        // ✅ Convert to cents
         const amountInCents = Math.round(calculatedAmount * 100);
 
-        // Create Stripe payment
+        // ✅ Create Stripe Payment Intent
         const paymentIntent = await stripe.paymentIntents.create({
-            amount: amountInCents,
-            currency,
-            payment_method: paymentMethodId,
-            confirm: true,
-            automatic_payment_methods: {
-                enabled: true,
-                allow_redirects: 'never'
-            },
-            metadata: {
-                bookingId: bookingId,
-                userId: req.user.userId,
-                type: 'new'
-
-            },
+        amount: amountInCents,
+        currency,
+        payment_method: paymentMethodId,
+        confirm: true,
+        automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
+        metadata: {
+            bookingId: bookingId,
+            userId: req.user.userId,
+            type: 'new',
+        },
         });
 
         res.status(200).json({
-            message: 'Payment processing started.',
-            client_secret: paymentIntent.client_secret,
+        message: 'Payment processing started.',
+        client_secret: paymentIntent.client_secret,
         });
-
     } catch (error) {
+        console.error('Payment Error:', error.message);
         await Book.findByIdAndUpdate(bookingId, { status: BookingStatus.FAILED });
         res.status(500).json({
             message: 'Payment failed. Please try again later.',
@@ -235,60 +242,69 @@ const renewBooking = async (req, res) => {
         if (!booking) return res.status(404).json({ message: 'Booking not found' });
 
         if (booking.user.toString() !== req.user.userId)
-            return res.status(403).json({ message: 'Unauthorized access' });
+        return res.status(403).json({ message: 'Unauthorized access' });
 
-        // Only allow renewal if serviceEndDate is within 3 days
+        // ✅ Only allow renewal within 3 days before expiry
         const now = new Date();
         const daysLeft = Math.ceil((booking.serviceEndDate - now) / (1000 * 60 * 60 * 24));
-        if (daysLeft > 3) return res.status(400).json({ message: 'Too early to renew' });
+        if (daysLeft > 3) {
+            return res.status(400).json({ message: 'Too early to renew' });
+        }
 
-        // Rates
-        const DAILY_RATE = process.env.DAILY_RATE;
-        const BI_WEEKLY_RATE = process.env.BI_WEEKLY_RATE;
-        const MONTHLY_RATE = process.env.MONTHLY_RATE;
+        // ✅ Get rate info from DB
+        const rate = await Rates.findOne();
+        if (!rate) return res.status(404).json({ message: 'Rate not configured yet.' });
+
+        const driverRates =
+        booking.ride_type === 'inhouse'
+            ? rate.in_house_drivers
+            : rate.freelance_drivers;
+
         let calculatedAmount = 0;
 
-        switch (booking.schedule_type) {
-            case 'custom':
-                if (!booking.number_of_days || booking.number_of_days <= 0) {
-                    return res.status(400).json({ message: 'Invalid number of days for custom schedule' });
-                }
-                calculatedAmount = DAILY_RATE * booking.number_of_days;
-                break;
+        if (booking.schedule_type === 'custom') {
+        if (!booking.number_of_days || booking.number_of_days <= 0) {
+            return res.status(400).json({ message: 'Invalid number of days for custom schedule' });
+        }
+        calculatedAmount =
+            driverRates.daily[booking.trip_type] * booking.number_of_days;
+        } else {
+        const scheduleKey =
+            booking.schedule_type === '2 weeks'
+            ? 'bi_weekly'
+            : booking.schedule_type === '1 month'
+            ? 'monthly'
+            : null;
 
-            case '2 weeks':
-                calculatedAmount = BI_WEEKLY_RATE;
-                break;
+        if (!scheduleKey) {
+            return res.status(400).json({ message: 'Invalid schedule type' });
+        }
 
-            case '1 month':
-                calculatedAmount = MONTHLY_RATE;
-                break;
-
-            default:
-                return res.status(400).json({ message: 'Invalid schedule type' });
+        calculatedAmount = driverRates[scheduleKey][booking.trip_type];
         }
 
         const amountInCents = Math.round(calculatedAmount * 100);
 
-        // Create Stripe payment
+        // ✅ Create Stripe Payment Intent for renewal
         const paymentIntent = await stripe.paymentIntents.create({
-            amount: amountInCents,
-            currency,
-            payment_method: paymentMethodId,
-            confirm: true,
-            metadata: {
-                bookingId: bookingId,
-                userId: req.user.userId,
-                type: 'renewal'
-            },
+        amount: amountInCents,
+        currency,
+        payment_method: paymentMethodId,
+        confirm: true,
+        automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
+        metadata: {
+            bookingId,
+            userId: req.user.userId,
+            type: 'renewal',
+        },
         });
 
         res.status(200).json({
-            message: ' Renewal payment processing started.',
-            client_secret: paymentIntent.client_secret,
+        message: 'Renewal payment processing started.',
+        client_secret: paymentIntent.client_secret,
         });
-
     } catch (error) {
+        console.error('Renewal Payment Error:', error.message);
         await Book.findByIdAndUpdate(bookingId, { status: BookingStatus.FAILED });
         res.status(500).json({
             message: 'Payment failed. Please try again later.',

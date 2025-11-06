@@ -24,8 +24,6 @@ const getUser = async (req, res) => {
 
 const getAllUsers = async (req, res) => {
     const users = await User.find({}, '-password -fcmTokens')
-    console.log(users);
-
     res.status(200).json({users})
 }
 
