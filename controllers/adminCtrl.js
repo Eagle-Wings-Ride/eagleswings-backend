@@ -52,83 +52,85 @@ const assignDriverToRide = async (req, res) => {
 
     try {
         // 🔒 Auth check
-        if (!adminId) {
-            return res.status(401).json({ message: "Unauthorized: Admin ID missing" });
-        }
+        if (!adminId) return res.status(401).json({ message: "Unauthorized: Admin ID missing" });
         const admin = await Admin.findById(adminId);
-        if (!admin) {
-            return res.status(404).json({ message: "Admin not found" });
-        }
+        if (!admin) return res.status(404).json({ message: "Admin not found" });
 
         // 🔎 Booking check
         const booking = await Book.findById(bookingId);
-        if (!booking) {
-            return res.status(404).json({ message: "Booking not found" });
-        }
-        if (booking.status !== "paid") {
-            return res.status(400).json({ message: "Booking must be paid before assigning a driver" });
-        }
+        if (!booking) return res.status(404).json({ message: "Booking not found" });
+        if (booking.status !== "paid") return res.status(400).json({ message: "Booking must be paid before assigning a driver" });
 
         // 🔎 Driver check
         const driver = await Driver.findById(driverId);
-        if (!driver) {
-            return res.status(404).json({ message: "Driver not found" });
-        }
-        if (!driver.isDriverApproved) {
-            return res.status(400).json({ message: "Driver has not been approved yet" });
-        }
+        if (!driver) return res.status(404).json({ message: "Driver not found" });
+        if (!driver.isDriverApproved) return res.status(400).json({ message: "Driver has not been approved yet" });
 
         // ⏰ Shift validation
         const validShifts = ["morning", "afternoon"];
         if (shift && !validShifts.includes(shift)) {
-            return res.status(400).json({ message: "Invalid shift. Use 'morning' or 'afternoon'" });
+        return res.status(400).json({ message: "Invalid shift. Use 'morning' or 'afternoon'" });
         }
-        // 🚫 Prevent duplicate driver assignment
+
+        // 🚫 Prevent duplicate driver assignment to same booking
         const existingAssignment = await Assignment.findOne({ booking: bookingId, driver: driverId });
-        if (existingAssignment) {
-            return res.status(400).json({ message: "Driver already assigned to this ride" });
+        if (existingAssignment) return res.status(400).json({ message: "Driver already assigned to this ride" });
+
+        // ⚠️ Shift assignment rules
+        const acceptedAssignments = await Assignment.find({ booking: bookingId, status: "accepted" });
+
+        let morningTaken = false;
+        let afternoonTaken = false;
+        let bothTakenByNullShift = false;
+
+        acceptedAssignments.forEach(a => {
+        if (!a.shift) bothTakenByNullShift = true; // null shift = driver took both
+        if (a.shift === "morning") morningTaken = true;
+        if (a.shift === "afternoon") afternoonTaken = true;
+        });
+
+        // If someone already accepted both shifts
+        if (bothTakenByNullShift) {
+        return res.status(400).json({ message: "Both shifts already taken by a driver" });
         }
-        // 🚫 Prevent duplicate shift assignment
+
+        // If assigning a shift and that shift is taken
         if (shift) {
-            const shiftTaken = await Assignment.findOne({ booking: bookingId, shift });
-            if (shiftTaken) {
-            return res.status(400).json({ message: `A driver is already assigned for ${shift} shift` });
-            }
+        if ((shift === "morning" && morningTaken) || (shift === "afternoon" && afternoonTaken)) {
+            const remainingShift = shift === "morning" ? "afternoon" : "morning";
+            return res.status(400).json({ message: `Shift already taken. Only ${remainingShift} shift remaining` });
+        }
         }
 
         // 🆕 Create new assignment
         const assignment = await Assignment.create({
-            booking: bookingId,
-            driver: driverId,
-            assignedBy: adminId,
-            shift: shift || null,
-            status: "pending", // driver must accept
+        booking: bookingId,
+        driver: driverId,
+        assignedBy: adminId,
+        shift: shift || null,
+        status: "pending",
         });
 
         // 📲 Notify driver
         if (driver.fcmTokens?.length > 0) {
-            await sendToTokens(
+        await sendToTokens(
             driver.fcmTokens,
             "New Ride Assigned",
             "You have a new ride request. Please accept it.",
             { bookingId, driverId }
-            );
+        );
         }
 
         return res.status(200).json({
-            message: "Driver assignment created (pending driver response)",
-            assignment,
+        message: "Driver assignment created (pending driver response)",
+        assignment,
         });
 
     } catch (error) {
         console.error("Error assigning driver:", error);
-        return res.status(500).json({
-            message: "Error assigning driver",
-            error: error.message,
-        });
+        return res.status(500).json({ message: "Error assigning driver", error: error.message });
     }
 };
-
 
 // Unassign Driver from ride
 const UnassignDriverFromRide = async (req, res) => {
