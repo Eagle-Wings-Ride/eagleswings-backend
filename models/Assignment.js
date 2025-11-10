@@ -15,7 +15,7 @@ const AssignmentSchema = new Schema({
   },
   status: {
     type: String,
-    enum: ['pending', 'accepted', 'rejected', 'cancelled', 'completed'],
+    enum: ['pending', 'accepted', 'rejected', 'in_progress', 'completed','cancelled' ],
     default: 'pending',
   },
   shift: { 
