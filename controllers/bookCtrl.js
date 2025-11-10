@@ -385,7 +385,14 @@ const getAllRides = async (req, res) => {
         // Merge drivers into rides
         const ridesWithDrivers = rides.map(ride => {
             const drivers = assignments.filter(a => a.booking.toString() === ride._id.toString())
-                                    .map(a => a.driver);
+                                    .map(a => ({
+                                        id: a.driver?._id,
+                                        fullname: a.driver?.fullname,
+                                        driverStatus: a.driver?.status,
+                                        image: a.driver?.image,
+                                        assignmentStatus: a.status, // from assignment model
+                                        shift: a.shift,
+                                    }));
             return { ...ride.toObject(), drivers };
         });
     
@@ -394,6 +401,7 @@ const getAllRides = async (req, res) => {
         res.status(500).json({ message: 'Error fetching rides', error: err.message });
         }
     };
+
 
 //Get all Users with paid rides 
 const getAllPaidUsers = async (req, res) => {
