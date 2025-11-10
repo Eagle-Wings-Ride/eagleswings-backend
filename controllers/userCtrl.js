@@ -45,7 +45,8 @@ const currentUser =  async (req, res) => {
         email: curruser.email,
         address: curruser.address,
         phone_number: curruser.phone_number,
-        is_verified: curruser.is_verified
+        is_verified: curruser.is_verified,
+        createdAt: curruser.createdAt
       }
     })
   } catch (error){
