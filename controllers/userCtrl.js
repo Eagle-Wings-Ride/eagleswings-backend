@@ -24,8 +24,6 @@ const getUser = async (req, res) => {
 
 const getAllUsers = async (req, res) => {
     const users = await User.find({}, '-password -fcmTokens')
-    console.log(users);
-
     res.status(200).json({users})
 }
 
@@ -47,7 +45,8 @@ const currentUser =  async (req, res) => {
         email: curruser.email,
         address: curruser.address,
         phone_number: curruser.phone_number,
-        is_verified: curruser.is_verified
+        is_verified: curruser.is_verified,
+        createdAt: curruser.createdAt
       }
     })
   } catch (error){

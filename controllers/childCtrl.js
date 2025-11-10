@@ -22,6 +22,18 @@ const addChild = async (req, res) => {
         let imageUrl = null
 
         if(req.file){
+            console.log("File details before Cloudinary upload:");
+            console.log({
+              fieldName: req.file.fieldname,
+              originalName: req.file.originalname,
+              mimetype: req.file.mimetype,
+              hasBuffer: !!req.file.buffer,
+              bufferLength: req.file.buffer ? req.file.buffer.length : 0
+            });
+          
+            if (!req.file.buffer || req.file.buffer.length === 0) {
+              throw new Error("Empty file buffer before upload");
+            }
             const uploadedFile = await uploadToCloudinary(req.file, 'children');
             imageUrl = uploadedFile.url;
         }
