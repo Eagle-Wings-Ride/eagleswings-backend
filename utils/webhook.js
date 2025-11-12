@@ -22,10 +22,10 @@ const stripeWebhook = async (req, res) => {
 
     try {
         switch (event.type) {
-            case 'payment_intent.succeeded': {
-                const intent = event.data.object;
-                const bookingId = intent.metadata.bookingId;
-                const paymentType = intent.metadata.type || 'new'; // 'new' or 'renewal'
+            case 'checkout.session.completed': {
+                const session = event.data.object;
+                const bookingId = session.metadata.bookingId;
+                const paymentType = session.metadata.type || 'new'; // 'new' or 'renewal'
 
                 const booking = await Book.findById(bookingId).populate('user child');
                 if (!booking) break;
@@ -96,10 +96,11 @@ const stripeWebhook = async (req, res) => {
 
                 break;
             }
-
-            case 'payment_intent.payment_failed': {
-                const intent = event.data.object;
-                const bookingId = intent.metadata.bookingId;
+            
+            case 'checkout.session.async_payment_failed':
+            case 'checkout.session.expired': {
+                const session = event.data.object;
+                const bookingId = session.metadata.bookingId;
                 const booking = await Book.findByIdAndUpdate(bookingId, { status: BookingStatus.FAILED }).populate('user child');
                 
                 if (booking?.user?.fcmTokens?.length) {
@@ -120,14 +121,7 @@ const stripeWebhook = async (req, res) => {
                         `Payment failed for booking ${booking._id} (${booking.child.fullname}).`,
                         { bookingId: booking._id.toString() }
                     );
-                }
-                break;
-            }
-
-            case 'payment_intent.canceled': {
-                const intent = event.data.object;
-                const bookingId = intent.metadata.bookingId;
-                await Book.findByIdAndUpdate(bookingId, { status: BookingStatus.CANCELLED });
+                }                
                 break;
             }
 
