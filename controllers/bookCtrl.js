@@ -5,6 +5,7 @@ const Child = require('../models/Child')
 const Admin = require('../models/Admin')
 const Rates = require('../models/Rate')
 const Assignment = require('../models/Assignment');
+const { calculateBookingAmount} = require('../utils/helpers/book.helpers');
 const { sendToTokens } = require('../utils/pushNotifications')
 
 
@@ -146,90 +147,75 @@ const bookRide = async (req, res) => {
 
 // Make Payment
 const makePayment = async (req, res) => {
-    const { bookingId, paymentMethodId, currency } = req.body;
+  const { bookingId, currency } = req.body;
 
-    if (!['usd', 'cad'].includes(currency)) {
-        return res.status(400).json({ message: 'Invalid currency. Only USD and CAD are supported.' });
+  // ✅ Only CAD for now
+  if (currency !== 'cad') {
+    return res.status(400).json({ message: 'Only CAD currency is supported.' });
+  }
+
+  try {
+    // 🔎 Find booking
+    const booking = await Book.findById(bookingId); // do not populate user
+    if (!booking) {
+      return res.status(404).json({ message: 'Booking not found' });
     }
 
-    try {
-        const booking = await Book.findById(bookingId);
-        if (!booking) return res.status(404).json({ message: 'Booking not found' });
+    // 🔒 Validate booking belongs to user
+    const bookingUserId = booking.user?._id
+      ? booking.user._id.toString()
+      : booking.user.toString(); // works for ObjectId or populated user
 
-        if (booking.user.toString() !== req.user.userId)
-        return res.status(403).json({ message: 'Unauthorized access' });
+    if (bookingUserId !== req.user.userId) {
+      return res.status(403).json({ message: 'Unauthorized access' });
+    }
 
-        if (![BookingStatus.BOOKED, BookingStatus.FAILED].includes(booking.status))
-        return res.status(400).json({ message: 'Booking is not eligible for payment' });
+    // ✅ Validate booking status
+    if (![BookingStatus.BOOKED, BookingStatus.FAILED].includes(booking.status)) {
+      return res.status(400).json({ message: 'Booking is not eligible for payment' });
+    }
 
-        // ✅ Fetch latest rates from DB
-        const rate = await Rates.findOne();
-        if (!rate) return res.status(404).json({ message: 'Rate not configured yet.' });
+    // 💲 Calculate amount
+    const amount = await calculateBookingAmount(booking);
 
-        // ✅ Determine rate category (in-house or freelance)
-        const driverRates =
-        booking.ride_type === 'inhouse'
-            ? rate.in_house_drivers
-            : rate.freelance_drivers;
-
-        // ✅ Determine which rate group to use (daily, bi_weekly, monthly)
-        let calculatedAmount = 0;
-
-        if (booking.schedule_type === 'custom') {
-        // Use daily rate multiplied by number of days
-        if (!booking.number_of_days || booking.number_of_days <= 0) {
-            return res.status(400).json({ message: 'Invalid number of days for custom schedule' });
-        }
-        calculatedAmount =
-            driverRates.daily[booking.trip_type] * booking.number_of_days;
-        } else {
-        // Map booking.schedule_type to model keys
-        const scheduleKey =
-            booking.schedule_type === '2 weeks'
-            ? 'bi_weekly'
-            : booking.schedule_type === '1 month'
-            ? 'monthly'
-            : null;
-
-        if (!scheduleKey) {
-            return res.status(400).json({ message: 'Invalid schedule type' });
-        }
-
-        calculatedAmount = driverRates[scheduleKey][booking.trip_type];
-        }
-
-        // ✅ Convert to cents
-        const amountInCents = Math.round(calculatedAmount * 100);
-
-        // ✅ Create Stripe Payment Intent
-        const paymentIntent = await stripe.paymentIntents.create({
-        amount: amountInCents,
-        currency,
-        payment_method: paymentMethodId,
-        confirm: true,
-        automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
-        metadata: {
-            bookingId: bookingId,
-            userId: req.user.userId,
-            type: 'new',
+    // 🛒 Create Stripe checkout session
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      mode: 'payment',
+      line_items: [{
+        price_data: {
+          currency,
+          product_data: {
+            name: `Ride booking - ${booking.schedule_type}`,
+            description: `Type: ${booking.ride_type}, Trip: ${booking.trip_type}`,
+          },
+          unit_amount: Math.round(amount * 100),
         },
-        });
+        quantity: 1,
+      }],
+      metadata: {
+        bookingId: booking._id.toString(),
+        userId: req.user.userId,
+        type: 'new',
+      },
+      success_url: `${process.env.CHECKOUT_URL}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.CHECKOUT_URL}/payment-cancelled`,
+    });
 
-        res.status(200).json({
-        message: 'Payment processing started.',
-        client_secret: paymentIntent.client_secret,
-        });
-    } catch (error) {
-        console.error('Payment Error:', error.message);
-        await Book.findByIdAndUpdate(bookingId, { status: BookingStatus.FAILED });
-        res.status(500).json({
-            message: 'Payment failed. Please try again later.',
-            error: error.message,
-        });
-    }
+    return res.status(200).json({
+      message: 'Checkout session created successfully',
+      url: session.url,
+    });
+
+  } catch (error) {
+    console.error('Error creating payment session:', error);
+    return res.status(500).json({
+      message: error.message || 'Payment session creation failed',
+    });
+  }
 };
 
-// Renew Payment
+// Renew Payment - to rewrite this 
 const renewBooking = async (req, res) => {
     const { bookingId, paymentMethodId, currency } = req.body;
 
