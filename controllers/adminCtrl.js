@@ -3,46 +3,55 @@ const Driver = require('../models/Driver')
 const Book = require('../models/Book')
 const Assignment = require('../models/Assignment')
 const { sendToTokens } = require('../utils/pushNotifications')
+const {
+    throwError,findOrThrow,
+    getShiftStatus,validateShift,
+    checkExistingAssignments} = require('../utils/helpers/drivers.helpers')
 
 // Approve Driver after Vetting
 const approveDriver = async (req, res) => {
-    const { id: driverId } = req.params
-    const { is_approved } = req.body
-    const adminId = req.user.adminId
+    const { id: driverId } = req.params;
+    const { is_approved } = req.body;
+    const adminId = req.user?.adminId;
     const role = req.user?.role;
 
-    if (!adminId) {
-        return res.status(401).json({ message: "Unauthorized: Admin ID missing" })
-    }
+    try {
+        // 🔒 Validate admin authentication
+        if (!adminId) throwError(401, "Unauthorized: Admin ID missing");
 
-    if (!['admin', 'superadmin'].includes(role)) {
-        return res.status(403).json({ message: "Forbidden: Only admin or superadmin can approve drivers" });
-    }
+        // 🔐 Validate admin role
+        if (!["admin", "superadmin"].includes(role)) {
+        throwError(403, "Forbidden: Only admin or superadmin can approve drivers");
+        }
 
-    if (typeof is_approved !== 'boolean') {
-        return res.status(400).json({ message: "Missing or invalid field: is_approved must be boolean" })
-    }
+        // 🧾 Validate input
+        if (typeof is_approved !== "boolean") {
+        throwError(400, "Invalid input: is_approved must be a boolean");
+        }
 
-    const admin = await Admin.findById(adminId)
-    if (!admin) {
-        return res.status(404).json({ message: "Admin not found" })
-    }
+        // 🔎 Validate admin and driver
+        await findOrThrow(Admin, adminId, "Admin not found");
 
-    const updatedDriver = await Driver.findByIdAndUpdate(
+        const updatedDriver = await Driver.findByIdAndUpdate(
         driverId,
         { isDriverApproved: is_approved },
         { new: true, runValidators: true }
-    );
+        );
 
-    if (!updatedDriver) {
-        return res.status(404).json({ message: "Driver not found" })
+        if (!updatedDriver) throwError(404, "Driver not found");
+
+        // ✅ Success response
+        return res.status(200).json({
+        message: `Driver has been ${is_approved ? "approved" : "disapproved"}!`,
+        driver: updatedDriver,
+        });
+    } catch (error) {
+        console.error("Error approving driver:", error);
+        return res.status(error.status || 500).json({
+        message: error.message || "Error approving driver",
+        });
     }
-
-    res.status(200).json({
-        message: `Driver has been ${is_approved ? 'approved' : 'disapproved'} !`,
-        driver: updatedDriver
-    })
-}
+};
 
 // Assign driver to the ride (booking)
 const assignDriverToRide = async (req, res) => {
@@ -51,58 +60,34 @@ const assignDriverToRide = async (req, res) => {
     const adminId = req.user?.adminId;
 
     try {
-        // 🔒 Auth check
-        if (!adminId) return res.status(401).json({ message: "Unauthorized: Admin ID missing" });
-        const admin = await Admin.findById(adminId);
-        if (!admin) return res.status(404).json({ message: "Admin not found" });
+        // 🔒 Validate admin
+        if (!adminId) throwError(401, "Unauthorized: Admin ID missing");
+        await findOrThrow(Admin, adminId, "Admin not found");
 
-        // 🔎 Booking check
-        const booking = await Book.findById(bookingId);
-        if (!booking) return res.status(404).json({ message: "Booking not found" });
-        if (booking.status !== "paid") return res.status(400).json({ message: "Booking must be paid before assigning a driver" });
+        // 🔎 Validate booking
+        const booking = await findOrThrow(Book, bookingId, "Booking not found");
+        if (!["paid", "assigned"].includes(booking.status))
+        throwError(400, "Booking must be paid or active before assigning a driver");
 
-        // 🔎 Driver check
-        const driver = await Driver.findById(driverId);
-        if (!driver) return res.status(404).json({ message: "Driver not found" });
-        if (!driver.isDriverApproved) return res.status(400).json({ message: "Driver has not been approved yet" });
+        // 🔎 Validate driver
+        const driver = await findOrThrow(Driver, driverId, "Driver not found");
+        if (!driver.isDriverApproved)
+        throwError(400, "Driver has not been approved yet");
 
-        // ⏰ Shift validation
-        const validShifts = ["morning", "afternoon"];
-        if (shift && !validShifts.includes(shift)) {
-        return res.status(400).json({ message: "Invalid shift. Use 'morning' or 'afternoon'" });
-        }
+        // ⏰ Validate shift input
+        validateShift(shift);
 
-        // 🚫 Prevent duplicate driver assignment to same booking
-        const existingAssignment = await Assignment.findOne({ booking: bookingId, driver: driverId });
-        if (existingAssignment) return res.status(400).json({ message: "Driver already assigned to this ride" });
-
-        // ⚠️ Shift assignment rules
-        const acceptedAssignments = await Assignment.find({ booking: bookingId, status: "accepted" });
-
-        let morningTaken = false;
-        let afternoonTaken = false;
-        let bothTakenByNullShift = false;
-
-        acceptedAssignments.forEach(a => {
-        if (!a.shift) bothTakenByNullShift = true; // null shift = driver took both
-        if (a.shift === "morning") morningTaken = true;
-        if (a.shift === "afternoon") afternoonTaken = true;
+        // ⚙️ Check shift availability
+        const acceptedAssignments = await Assignment.find({
+        booking: bookingId,
+        status: "accepted",
         });
+        const shiftStatus = getShiftStatus(acceptedAssignments);
 
-        // If someone already accepted both shifts
-        if (bothTakenByNullShift) {
-        return res.status(400).json({ message: "Both shifts already taken by a driver" });
-        }
+        // 🚫 Handle invalid shift or duplicate
+        await checkExistingAssignments(shiftStatus, bookingId, driverId, shift);
 
-        // If assigning a shift and that shift is taken
-        if (shift) {
-        if ((shift === "morning" && morningTaken) || (shift === "afternoon" && afternoonTaken)) {
-            const remainingShift = shift === "morning" ? "afternoon" : "morning";
-            return res.status(400).json({ message: `Shift already taken. Only ${remainingShift} shift remaining` });
-        }
-        }
-
-        // 🆕 Create new assignment
+        // 🆕 Create assignment
         const assignment = await Assignment.create({
         booking: bookingId,
         driver: driverId,
@@ -111,8 +96,8 @@ const assignDriverToRide = async (req, res) => {
         status: "pending",
         });
 
-        // 📲 Notify driver
-        if (driver.fcmTokens?.length > 0) {
+        // 🔔 Notify driver
+        if (driver.fcmTokens?.length) {
         await sendToTokens(
             driver.fcmTokens,
             "New Ride Assigned",
@@ -125,10 +110,11 @@ const assignDriverToRide = async (req, res) => {
         message: "Driver assignment created (pending driver response)",
         assignment,
         });
-
     } catch (error) {
         console.error("Error assigning driver:", error);
-        return res.status(500).json({ message: "Error assigning driver", error: error.message });
+        return res.status(error.status || 500).json({
+        message: error.message || "Error assigning driver",
+        });
     }
 };
 
@@ -136,47 +122,39 @@ const assignDriverToRide = async (req, res) => {
 const UnassignDriverFromRide = async (req, res) => {
     const { driverId } = req.body;
     const { bookingId } = req.params;
-    const adminId = req.user.adminId;
-
-    if (!adminId) {
-        return res.status(401).json({ message: "Unauthorized: Admin ID missing" });
-    }
-
-    const admin = await Admin.findById(adminId);
-    if (!admin) {
-        return res.status(404).json({ message: "Admin not found" });
-    }
+    const adminId = req.user?.adminId;
 
     try {
-      // Find assignment
-        const assignment = await Assignment.findOneAndDelete({ booking: bookingId, driver: driverId })
+        // 🔒 Validate admin
+        if (!adminId) throwError(401, "Unauthorized: Admin ID missing");
+        await findOrThrow(Admin, adminId, "Admin not found");
 
-        if (!assignment) {
-            return res.status(404).json({ message: "No assignment found for this driver and booking" })
-        }
+        // 🧾 Find and remove assignment
+        const assignment = await Assignment.findOneAndDelete({ booking: bookingId, driver: driverId });
+        if (!assignment) throwError(404, "No assignment found for this driver and booking");
 
-      // Notify driver that they were unassigned
+        // 🔔 Notify driver
         const driver = await Driver.findById(driverId);
         if (driver?.fcmTokens?.length > 0) {
-            await sendToTokens(
+        await sendToTokens(
             driver.fcmTokens,
             "Ride Unassigned",
             "You have been unassigned from a ride by the admin.",
             { bookingId, driverId }
-            )
+        );
         }
 
-        res.status(200).json({
-            message: "Driver unassigned successfully",
-            removedAssignment: assignment,
-        })
+        return res.status(200).json({
+        message: "Driver unassigned successfully",
+        removedAssignment: assignment,
+        });
     } catch (error) {
-        res.status(500).json({
-            message: "Error unassigning driver",
-            error: error.message,
-        })
+        console.error("Error unassigning driver:", error);
+        return res.status(error.status || 500).json({
+        message: error.message || "Error unassigning driver",
+        });
     }
-}
+};
 
 
 // get driver by location (in progress)
