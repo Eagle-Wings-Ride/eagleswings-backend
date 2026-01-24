@@ -1,0 +1,16 @@
+name: Service Expiration Cron
+
+on:
+  schedule:
+    - cron: '0 0 * * *' # once per day (UTC)
+  workflow_dispatch:
+
+jobs:
+  run-cron:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call expiration cron endpoint
+        run: |
+          curl -X POST ${{ secrets.CRON_ENDPOINT }} \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json"
