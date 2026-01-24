@@ -20,13 +20,13 @@ const checkExpirations = async () => {
       const daysLeft = Math.ceil((booking.serviceEndDate - now) / DAY);
 
       // Production-safe logging
-      // console.log(`[CRON] Booking ${booking._id} | daysLeft: ${daysLeft} | reminderSent: ${booking.reminderSent}`);
+      console.log(`[CRON] Booking ${booking._id} | daysLeft: ${daysLeft} | reminderSent: ${booking.reminderSent}`);
 
       // Dev-only logging (uncomment if needed locally)
-      
+      /*
       if (process.env.NODE_ENV !== "production") {
         console.log(`[CRON-DEV] Booking ${booking._id} | User: ${booking.user.fullname} | daysLeft: ${daysLeft} | reminderSent: ${booking.reminderSent}`);
-      }
+      }*/
       
 
       let modified = false;
