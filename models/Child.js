@@ -7,11 +7,14 @@ const ChildSchema = new Schema({
       required: [true, 'Please provide name'],
       minlength: 3,
       maxlength: 50,
+      trim: true
     },
     image: String,
+    image_public_id: String,
     age: {
       type: Number,
       required: [true, 'Please provide ward age'],
+      min: 0
     },
     grade: String,
     relationship: String,
@@ -29,10 +32,6 @@ const ChildSchema = new Schema({
       ref: 'User',
       required: true
     },
-    createdAt: {
-        type: Date,
-        default: Date.now() 
-    }
-  });
+  }, {timestamps: true});
 
 module.exports = mongoose.model('Child', ChildSchema)
