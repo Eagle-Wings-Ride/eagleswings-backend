@@ -27,10 +27,10 @@ const BookSchema = new Schema({
     pickup_days: {
       type: [String],
       enum: ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'],
-      default: [],
+      required: true,
     },
     start_date: {
-      type: String,
+      type: Date,
       required: true,
     },
   
@@ -102,10 +102,6 @@ const BookSchema = new Schema({
       ref: 'Child',
       required: true,
     },
-    createdAt: {
-      type: Date,
-      default: Date.now,
-    },
     serviceEndDate: {
       type: Date,
       required: false,
@@ -115,7 +111,7 @@ const BookSchema = new Schema({
       default: false,
     }
     
-  })
+  }, {timestamps: true})
 
 
 module.exports = mongoose.model('Bookings', BookSchema);
