@@ -21,7 +21,6 @@ const {
   DaysOfWeek,
 } = require("../utils/bookingEnum");
 
-
 // Book ride
 const bookRide = async (req, res) => {
   const { id: childId } = req.params;
@@ -81,25 +80,8 @@ const bookRide = async (req, res) => {
     }
 
     /** ---------------- TRIP LOGIC ---------------- */
-    const hasMorning = morning_from && morning_to && morning_time;
-
-    const hasAfternoon = afternoon_from && afternoon_to && afternoon_time;
-
-    if (trip_type === TripType.ONE_WAY) {
-      if (hasMorning === hasAfternoon) {
-        return res.status(400).json({
-          message: "One-way ride must have either a morning or afternoon trip",
-        });
-      }
-    }
-
-    if (trip_type === TripType.RETURN) {
-      if (!hasMorning || !hasAfternoon) {
-        return res.status(400).json({
-          message: "Return ride requires both morning and afternoon trips",
-        });
-      }
-    }
+    const hasMorning = morning_from || morning_to || morning_time;
+    const hasAfternoon = afternoon_from || afternoon_to || afternoon_time;
 
     if (hasMorning && morning_from === morning_to) {
       return res.status(400).json({
@@ -199,14 +181,11 @@ const bookRide = async (req, res) => {
     });
   } catch (error) {
     console.error(error);
-    res
-      .status(500)
-      .json({
-        message: "An error occurred while booking the ride." || error.message,
-      });
+    res.status(500).json({
+      message: "An error occurred while booking the ride." || error.message,
+    });
   }
 };
-
 
 // Make Payment
 const makePayment = async (req, res) => {
@@ -267,6 +246,7 @@ const makePayment = async (req, res) => {
         userId: req.user.userId,
         type: "new",
       },
+      customer_email: booking.user.email,
       success_url: `${process.env.CHECKOUT_URL}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.CHECKOUT_URL}/payment-cancelled`,
     });
@@ -283,7 +263,7 @@ const makePayment = async (req, res) => {
   }
 };
 
-// Renew Payment - to rewrite this
+// Renew Payment
 const renewBooking = async (req, res) => {
   const { bookingId, paymentMethodId, currency } = req.body;
 
