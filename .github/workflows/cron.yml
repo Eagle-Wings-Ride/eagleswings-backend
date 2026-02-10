@@ -1,16 +1,26 @@
-name: Service Expiration Cron
+name: Cron - Check Booking Expirations
 
 on:
   schedule:
-    - cron: '0 0 * * *' # once per day (UTC)
+    - cron: "0 0 * * *" # once per day at 00:00 UTC
   workflow_dispatch:
 
 jobs:
-  run-cron:
+  run-expiration-cron:
     runs-on: ubuntu-latest
+
     steps:
       - name: Call expiration cron endpoint
         run: |
-          curl -X POST ${{ secrets.CRON_ENDPOINT }} \
+          STATUS=$(curl -s -o response.txt -w "%{http_code}" \
+            -X POST "${{ secrets.CRON_ENDPOINT }}" \
             -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
-            -H "Content-Type: application/json"
+            -H "Content-Type: application/json")
+
+          echo "Response:"
+          cat response.txt
+
+          if [ "$STATUS" -ne 200 ]; then
+            echo "Cron failed with status $STATUS"
+            exit 1
+          fi

@@ -2,69 +2,90 @@ const Book = require("../models/Book");
 const Admin = require("../models/Admin");
 const { sendToTokens } = require("../utils/pushNotifications");
 const sendReminderEmail = require("../utils/sendReminderEmail");
+const { BookingStatus } = require("../utils/bookingEnum");
 
 const DAY = 1000 * 60 * 60 * 24;
 
 const checkExpirations = async () => {
   const now = new Date();
-  console.log("[CRON] Checking service expirations at", now.toISOString());
+  console.log("[CRON] Running service expiration check:", now.toISOString());
 
-  try {
-    const bookings = await Book.find({ status: "paid" }).populate("user");
-    const admins = await Admin.find({ fcmTokens: { $exists: true, $ne: [] } }).select("fcmTokens");
-    const tokens = admins.flatMap(a => a.fcmTokens);
+  // Only fetch relevant bookings
+  const bookings = await Book.find({
+    status: BookingStatus.PAID,
+    serviceEndDate: { $exists: true },
+  }).populate("user");
 
-    for (const booking of bookings) {
-      if (!booking.serviceEndDate || !booking.user) continue;
+  const admins = await Admin.find({
+    fcmTokens: { $exists: true, $ne: [] },
+  }).select("fcmTokens");
 
-      const daysLeft = Math.ceil((booking.serviceEndDate - now) / DAY);
+  const tokens = admins.flatMap(a => a.fcmTokens);
 
-      // Production-safe logging
-      console.log(`[CRON] Booking ${booking._id} | daysLeft: ${daysLeft} | reminderSent: ${booking.reminderSent}`);
+  for (const booking of bookings) {
+    if (!booking.user) continue;
 
-      // Dev-only logging (uncomment if needed locally)
-      /*
-      if (process.env.NODE_ENV !== "production") {
-        console.log(`[CRON-DEV] Booking ${booking._id} | User: ${booking.user.fullname} | daysLeft: ${daysLeft} | reminderSent: ${booking.reminderSent}`);
-      }*/
-      
+    const daysLeft = Math.ceil(
+      (booking.serviceEndDate.getTime() - now.getTime()) / DAY
+    );
 
-      let modified = false;
+    console.log(
+      `[CRON] Booking ${booking._id} | daysLeft=${daysLeft} | reminderSent=${booking.reminderSent}`
+    );
 
-      // 🔔 Send reminder
-      if (daysLeft <= 3 && daysLeft > 0 && !booking.reminderSent) {
+    // 🔔 Send reminder (atomic)
+    if (daysLeft <= 3 && daysLeft > 0) {
+      const result = await Book.updateOne(
+        { _id: booking._id, reminderSent: false },
+        { $set: { reminderSent: true } }
+      );
+
+      if (result.modifiedCount === 1) {
         try {
-          await sendReminderEmail({ name: booking.user.fullname, email: booking.user.email });
+          await sendReminderEmail({
+            name: booking.user.fullname,
+            email: booking.user.email,
+          });
 
           if (tokens.length) {
-            await sendToTokens(tokens, "Service Expiration Reminder", 
-              `Booking expires in ${daysLeft} day(s).`, 
+            await sendToTokens(
+              tokens,
+              "Service Expiration Reminder",
+              `Booking expires in ${daysLeft} day(s).`,
               { bookingId: booking._id.toString() }
             );
           }
 
-          booking.reminderSent = true;
-          modified = true;
-
           console.log(`[CRON] Reminder sent for booking ${booking._id}`);
         } catch (err) {
-          console.error(`[CRON] Failed sending reminder for booking ${booking._id}`, err);
+          console.error(
+            `[CRON] Reminder failed for booking ${booking._id}`,
+            err
+          );
+
+          // rollback reminderSent on failure
+          await Book.updateOne(
+            { _id: booking._id },
+            { $set: { reminderSent: false } }
+          );
         }
       }
+    }
 
-      // ⛔ Expire service
-      if (daysLeft <= 0 && booking.status !== "expired") {
-        booking.status = "expired";
-        modified = true;
+    // ⛔ Expire booking (atomic)
+    if (daysLeft <= 0) {
+      const result = await Book.updateOne(
+        { _id: booking._id, status: BookingStatus.PAID },
+        { $set: { status: BookingStatus.EXPIRED } }
+      );
+
+      if (result.modifiedCount === 1) {
         console.log(`[CRON] Booking expired ${booking._id}`);
       }
-
-      if (modified) await booking.save();
     }
-  } catch (err) {
-    console.error("[CRON] Fatal error:", err);
-    throw err;
   }
+
+  console.log("[CRON] Service expiration check complete");
 };
 
 module.exports = checkExpirations;
