@@ -9,6 +9,7 @@ const Admin = require("../models/Admin");
 const StripeEvent = require("../models/stripeEvent");
 
 const { BookingStatus } = require("../utils/bookingEnum");
+const {calculateBookingAmount} = require('../utils/helpers/book.helpers')
 
 const endpointSecret = process.env.ENDPOINT_SECRET_PROD;
 
@@ -59,16 +60,25 @@ const stripeWebhook = async (req, res) => {
        */
       case "checkout.session.completed": {
         const session = event.data.object;
-
-        if (session.payment_status !== "paid") break;
-
         const bookingId = session.metadata?.bookingId;
-        if (!bookingId) break;
-
         const paymentType = session.metadata?.type || "new";
+
+        if (!bookingId) break;
+        if (session.payment_status !== "paid") break;
 
         const booking = await Book.findById(bookingId).populate("user child");
         if (!booking) break;
+
+        // --- Amount Verification ---
+        const expectedAmount = await calculateBookingAmount(booking);
+        const paidAmount = session.amount_total / 100; // Stripe sends in cents
+
+        if (paidAmount !== expectedAmount) {
+           console.error(
+             `Amount mismatch for booking ${bookingId}: expected ${expectedAmount}, paid ${paidAmount}`
+           );
+           break; // Do NOT mark as paid.
+         }
 
         // Prevent double payment
         if (booking.status === BookingStatus.PAID) break;
@@ -100,16 +110,20 @@ const stripeWebhook = async (req, res) => {
          * User push notification
          */
         if (booking.user?.fcmTokens?.length) {
-          await sendToTokens(
-            booking.user.fcmTokens,
-            paymentType === "renewal"
-              ? "Booking Renewed"
-              : "Payment Successful",
-            paymentType === "renewal"
-              ? `Your booking for ${booking.child.fullname} has been successfully renewed.`
-              : `Your payment for ${booking.child.fullname}'s ride was successful.`,
-            { bookingId: booking._id.toString() }
-          );
+          try {
+            await sendToTokens(
+              booking.user.fcmTokens,
+              paymentType === "renewal"
+                ? "Booking Renewed"
+                : "Payment Successful",
+              paymentType === "renewal"
+                ? `Your booking for ${booking.child.fullname} has been successfully renewed.`
+                : `Your payment for ${booking.child.fullname}'s ride was successful.`,
+              { bookingId: booking._id.toString() }
+            );
+          } catch (err) {
+            console.error("User push notification failed:", err.message)
+          }
         }
 
         /**
@@ -147,16 +161,20 @@ const stripeWebhook = async (req, res) => {
         const adminTokens = admins.flatMap((a) => a.fcmTokens);
 
         if (adminTokens.length) {
-          await sendToTokens(
-            adminTokens,
-            paymentType === "renewal"
-              ? "Booking Renewed"
-              : "Payment Received",
-            paymentType === "renewal"
-              ? `Booking ${booking._id} for ${booking.child.fullname} has been renewed.`
-              : `Payment received for booking ${booking._id} (${booking.child.fullname}).`,
-            { bookingId: booking._id.toString() }
-          );
+          try {
+            await sendToTokens(
+              adminTokens,
+              paymentType === "renewal"
+                ? "Booking Renewed"
+                : "Payment Received",
+              paymentType === "renewal"
+                ? `Booking ${booking._id} for ${booking.child.fullname} has been renewed.`
+                : `Payment received for booking ${booking._id} (${booking.child.fullname}).`,
+              { bookingId: booking._id.toString() }
+            );
+          } catch (err) {
+            console.error("Admin push notification failed:", err.message)
+          }
         }
 
         break;
@@ -180,12 +198,38 @@ const stripeWebhook = async (req, res) => {
         ).populate("user child");
 
         if (booking?.user?.fcmTokens?.length) {
-          await sendToTokens(
-            booking.user.fcmTokens,
-            "Payment Failed",
-            `Your payment for ${booking.child.fullname}'s ride failed. Please retry.`,
-            { bookingId: booking._id.toString() }
-          );
+          try{
+            await sendToTokens(
+              booking.user.fcmTokens,
+              "Payment Failed",
+              `Your payment for ${booking.child.fullname}'s ride failed. Please retry.`,
+              { bookingId: booking._id.toString() }
+            );
+          } catch (err){
+            console.error("User failure notification failed:", err.message);
+          }
+        }
+
+        // Admin notification
+
+        const admins = await Admin.find({
+          role: "admin",
+          fcmTokens: { $exists: true, $ne: [] },
+        }).select("fcmTokens");
+
+        const adminTokens = admins.flatMap((a) => a.fcmTokens);
+
+        if (adminTokens.length) {
+          try {
+            await sendToTokens(
+              adminTokens,
+              "Payment Failed",
+              `Payment failed for booking ${booking._id} (${booking.child.fullname}).`,
+              { bookingId: booking._id.toString() }
+            );
+          } catch (err) {
+            console.error("Admin failure notification failed:", err.message);
+          }
         }
 
         break;
