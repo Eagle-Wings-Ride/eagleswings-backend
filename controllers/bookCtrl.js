@@ -315,6 +315,10 @@ const renewBooking = async (req, res) => {
     // Calculate renewal amount (single source of truth)
     const amount = await calculateBookingAmount(booking);
 
+    if (!amount || isNaN(amount)) {
+      throw new Error("Booking amount is invalid, cannot create Stripe session");
+    }
+
     // Get product data for Stripe
     const productData = getStripeProductData(booking, "renewal");
 
