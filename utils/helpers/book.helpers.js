@@ -59,8 +59,30 @@ const validateCustomDays = (days) => {
   }
 };
 
+const getStripeProductData = (booking, paymentType) => {
+  const childName = booking.child ? booking.child.fullname : "Unknown Child";
+
+  const name =
+    paymentType === "renewal"
+      ? `Booking Renewal - ${booking.schedule_type} for ${childName}`
+      : `Ride Booking - ${booking.schedule_type} for ${childName}`;
+
+  const descriptionParts = [];
+  if (paymentType === "renewal") descriptionParts.push(`Renewal for booking: ${childName}`);
+  else descriptionParts.push(`New booking for: ${childName}`);
+
+  descriptionParts.push(`Ride Type: ${booking.ride_type}`);
+  descriptionParts.push(`Trip Type: ${booking.trip_type}`);
+
+  if (booking.serviceEndDate) descriptionParts.push(`Expires: ${booking.serviceEndDate.toDateString()}`);
+
+  return { name, description: descriptionParts.join(" | ") };
+}
+
+
 module.exports = {
   calculateBookingAmount,
   validateStartDate,
   validateCustomDays,
+  getStripeProductData
 };

@@ -6,6 +6,7 @@ const sendRenewalEmail = require("./sendRenewalEmail");
 
 const Book = require("../models/Book");
 const Admin = require("../models/Admin");
+const BookingRenewalHistory = require("../models/bookingHistory")
 const StripeEvent = require("../models/stripeEvent");
 
 const { BookingStatus } = require("../utils/bookingEnum");
@@ -74,11 +75,11 @@ const stripeWebhook = async (req, res) => {
         const paidAmount = session.amount_total / 100; // Stripe sends in cents
 
         if (paidAmount !== expectedAmount) {
-           console.error(
-             `Amount mismatch for booking ${bookingId}: expected ${expectedAmount}, paid ${paidAmount}`
-           );
+          console.error(
+            `Amount mismatch for booking ${bookingId}: expected ${expectedAmount}, paid ${paidAmount}`
+          );
            break; // Do NOT mark as paid.
-         }
+        }
 
         // Prevent double payment
         if (booking.status === BookingStatus.PAID) break;
@@ -89,9 +90,13 @@ const stripeWebhook = async (req, res) => {
         /**
          * Service end date calculation
          */
-        let newServiceEndDate = booking.serviceEndDate
-          ? new Date(booking.serviceEndDate)
-          : new Date();
+        const now = new Date();
+        const serviceStartDate = booking.serviceEndDate >= now 
+        ? new Date(booking.serviceEndDate.getTime() + DAY) // start counting the next day
+        : now;
+
+         // --- Calculate new end date ---
+        let newServiceEndDate = new Date(serviceStartDate);
 
         if (booking.schedule_type === "custom") {
           newServiceEndDate.setDate(
@@ -103,6 +108,22 @@ const stripeWebhook = async (req, res) => {
           newServiceEndDate.setMonth(newServiceEndDate.getMonth() + 1);
         }
 
+        // --- Save renewal history if applicable ---
+        if (paymentType === "renewal") {
+          await BookingRenewalHistory.create({
+            booking: booking._id,
+            user: booking.user._id,
+            child: booking.child._id,
+            previousStartDate: booking.start_date,
+            previousEndDate: booking.serviceEndDate,
+            newStartDate: serviceStartDate,
+            newEndDate: newServiceEndDate,
+            paymentId: session.id,
+            amount: paidAmount,
+          });
+        }
+        console.log(BookingRenewalHistory)
+        booking.start_date = serviceStartDate;
         booking.serviceEndDate = newServiceEndDate;
         await booking.save();
 

@@ -3,9 +3,8 @@ const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const Book = require("../models/Book");
 const Child = require("../models/Child");
 const Admin = require("../models/Admin");
-const Rates = require("../models/Rate");
 const Assignment = require("../models/Assignment");
-const { calculateBookingAmount } = require("../utils/helpers/book.helpers");
+const { calculateBookingAmount, getStripeProductData } = require("../utils/helpers/book.helpers");
 const { sendToTokens } = require("../utils/pushNotifications");
 const {
   validateStartDate,
@@ -20,6 +19,7 @@ const {
   BookingStatus,
   DaysOfWeek,
 } = require("../utils/bookingEnum");
+
 
 // Book ride
 const bookRide = async (req, res) => {
@@ -198,7 +198,7 @@ const makePayment = async (req, res) => {
 
   try {
     // 🔎 Find booking
-    const booking = await Book.findById(bookingId); // do not populate user
+    const booking = await Book.findById(bookingId).populate("user", "email");
     if (!booking) {
       return res.status(404).json({ message: "Booking not found" });
     }
@@ -224,6 +224,9 @@ const makePayment = async (req, res) => {
     // 💲 Calculate amount
     const amount = await calculateBookingAmount(booking);
 
+    // Get product data for Stripe
+    const productData = getStripeProductData(booking, "new");
+
     // 🛒 Create Stripe checkout session
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
@@ -232,10 +235,7 @@ const makePayment = async (req, res) => {
         {
           price_data: {
             currency,
-            product_data: {
-              name: `Ride booking - ${booking.schedule_type}`,
-              description: `Type: ${booking.ride_type}, Trip: ${booking.trip_type}`,
-            },
+            product_data: productData,
             unit_amount: Math.round(amount * 100),
           },
           quantity: 1,
@@ -265,94 +265,95 @@ const makePayment = async (req, res) => {
 
 // Renew Payment
 const renewBooking = async (req, res) => {
-  const { bookingId, paymentMethodId, currency } = req.body;
+  const { bookingId, currency } = req.body;
+  const DAY = 1000 * 60 * 60 * 24;
 
-  if (!["usd", "cad"].includes(currency)) {
-    return res
-      .status(400)
-      .json({ message: "Invalid currency. Only USD and CAD are supported." });
+  // ✅ Currency restriction
+  if (!["cad"].includes(currency)) {
+    return res.status(400).json({
+      message: "Only CAD currency is supported.",
+    });
   }
 
   try {
-    const booking = await Book.findById(bookingId);
-    if (!booking) return res.status(404).json({ message: "Booking not found" });
+    // Fetch booking
+    const booking = await Book.findById(bookingId).populate("user child");
+    if (!booking) {
+      return res.status(404).json({ message: "Booking not found" });
+    }
 
-    if (booking.user.toString() !== req.user.userId)
+    // Ownership check
+    if (booking.user._id.toString() !== req.user.userId) {
       return res.status(403).json({ message: "Unauthorized access" });
+    }
 
-    // ✅ Only allow renewal within 3 days before expiry
+    // Booking must be paid or expired
+    if (![BookingStatus.PAID, BookingStatus.EXPIRED].includes(booking.status)) {
+      return res.status(400).json({
+        message: "Booking is not eligible for renewal",
+      });
+    }
+
+    // Renewal window check (within 3 days of expiry)
+    if (!booking.serviceEndDate) {
+      return res.status(400).json({
+        message: "Booking has no service end date",
+      });
+    }
+
     const now = new Date();
     const daysLeft = Math.ceil(
-      (booking.serviceEndDate - now) / (1000 * 60 * 60 * 24)
+      (booking.serviceEndDate - now) / DAY
     );
+
     if (daysLeft > 3) {
-      return res.status(400).json({ message: "Too early to renew" });
+      return res.status(400).json({
+        message: "Renewal is only allowed within 3 days of expiration",
+      });
     }
 
-    // ✅ Get rate info from DB
-    const rate = await Rates.findOne();
-    if (!rate)
-      return res.status(404).json({ message: "Rate not configured yet." });
+    // Calculate renewal amount (single source of truth)
+    const amount = await calculateBookingAmount(booking);
 
-    const driverRates =
-      booking.ride_type === "inhouse"
-        ? rate.in_house_drivers
-        : rate.freelance_drivers;
+    // Get product data for Stripe
+    const productData = getStripeProductData(booking, "renewal");
 
-    let calculatedAmount = 0;
-
-    if (booking.schedule_type === "custom") {
-      if (!booking.number_of_days || booking.number_of_days <= 0) {
-        return res
-          .status(400)
-          .json({ message: "Invalid number of days for custom schedule" });
-      }
-      calculatedAmount =
-        driverRates.daily[booking.trip_type] * booking.number_of_days;
-    } else {
-      const scheduleKey =
-        booking.schedule_type === "2 weeks"
-          ? "bi_weekly"
-          : booking.schedule_type === "1 month"
-          ? "monthly"
-          : null;
-
-      if (!scheduleKey) {
-        return res.status(400).json({ message: "Invalid schedule type" });
-      }
-
-      calculatedAmount = driverRates[scheduleKey][booking.trip_type];
-    }
-
-    const amountInCents = Math.round(calculatedAmount * 100);
-
-    // ✅ Create Stripe Payment Intent for renewal
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: amountInCents,
-      currency,
-      payment_method: paymentMethodId,
-      confirm: true,
-      automatic_payment_methods: { enabled: true, allow_redirects: "never" },
+    // 6️⃣ Create Stripe Checkout Session
+    const session = await stripe.checkout.sessions.create({
+      mode: "payment",
+      payment_method_types: ["card"],
+      line_items: [
+        {
+          price_data: {
+            currency,
+            product_data: productData,
+            unit_amount: Math.round(amount * 100),
+          },
+          quantity: 1,
+        },
+      ],
       metadata: {
-        bookingId,
+        bookingId: booking._id.toString(),
         userId: req.user.userId,
         type: "renewal",
       },
+      customer_email: booking.user.email,
+      success_url: `${process.env.CHECKOUT_URL}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.CHECKOUT_URL}/payment-cancelled`,
     });
 
-    res.status(200).json({
-      message: "Renewal payment processing started.",
-      client_secret: paymentIntent.client_secret,
+    return res.status(200).json({
+      message: "Renewal checkout session created",
+      url: session.url,
     });
-  } catch (error) {
-    console.error("Renewal Payment Error:", error.message);
-    await Book.findByIdAndUpdate(bookingId, { status: BookingStatus.FAILED });
-    res.status(500).json({
-      message: "Payment failed. Please try again later.",
-      error: error.message,
+  } catch (err) {
+    console.error("Renew booking error:", err);
+    return res.status(500).json({
+      message: "Unable to initiate renewal at this time",
     });
   }
 };
+
 
 // find all rides created by the user
 const getRidesByUser = async (req, res) => {
@@ -466,18 +467,18 @@ const getAllRides = async (req, res) => {
 //Get all Users with paid rides
 const getAllPaidUsers = async (req, res) => {
   try {
-    // 1️⃣ Get all paid bookings
+    // Get all paid bookings
     const rides = await Book.find({ status: "paid" })
       .populate("user", "fullname address phone_number")
       .populate("child", "fullname image grade age trip_type school");
 
-    // 2️⃣ Get all assignments related to these rides
+    // Get all assignments related to these rides
     const rideIds = rides.map((r) => r._id);
     const assignments = await Assignment.find({
       booking: { $in: rideIds },
     }).populate("driver", "fullname image status");
 
-    // 3️⃣ Merge drivers into rides
+    // Merge drivers into rides
     const ridesWithDrivers = rides.map((ride) => {
       const drivers = assignments
         .filter((a) => a.booking.toString() === ride._id.toString())
@@ -485,13 +486,13 @@ const getAllPaidUsers = async (req, res) => {
       return { ...ride.toObject(), drivers };
     });
 
-    // 4️⃣ Get unique users (avoid duplicates if multiple bookings)
+    // Get unique users (avoid duplicates if multiple bookings)
     const users = rides.map((r) => r.user);
     const uniqueUsers = Array.from(
       new Set(users.map((u) => u._id.toString()))
     ).map((id) => users.find((u) => u._id.toString() === id));
 
-    // 5️⃣ Send response
+    // Send response
     res.status(200).json({ rides: ridesWithDrivers, users: uniqueUsers });
   } catch (err) {
     console.error(err);
@@ -604,6 +605,12 @@ const updateRideStatus = async (req, res) => {
           BookingStatus
         ).join(", ")}`,
       });
+    }
+
+    // check if user is admin
+    const admin = await Admin.findById(req.user.userId);
+    if (!admin) {
+      return res.status(403).json({ message: "Only admins can update ride status" });
     }
 
     // Find the ride and update its status
