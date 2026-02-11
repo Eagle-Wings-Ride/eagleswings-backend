@@ -22,6 +22,7 @@ const BookingStatus = {
     FAILED: 'payment_failed',
     COMPLETED: 'completed',
     CANCELLED: 'cancelled',
+    EXPIRED: 'expired'
 };
 
 const DaysOfWeek = {

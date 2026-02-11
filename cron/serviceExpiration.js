@@ -1,69 +1,91 @@
-const cron = require('node-cron');
-const Book = require('../models/Book');
-const { sendToTokens } = require('../utils/pushNotifications'); // your Firebase utils
-const Admin = require('../models/Admin');
-const sendReminderEmail = require('../utils/sendReminderEmail');
+const Book = require("../models/Book");
+const Admin = require("../models/Admin");
+const { sendToTokens } = require("../utils/pushNotifications");
+const sendReminderEmail = require("../utils/sendReminderEmail");
+const { BookingStatus } = require("../utils/bookingEnum");
 
-// Cron function to check service expirations and send reminders
+const DAY = 1000 * 60 * 60 * 24;
+
 const checkExpirations = async () => {
-    const now = new Date();
+  const now = new Date();
+  console.log("[CRON] Running service expiration check:", now.toISOString());
 
-    try {
-        // Find all paid bookings whose service end date is not yet passed
-        const bookings = await Book.find({
-            status: 'paid',
-            serviceEndDate: { $gte: now }
-        }).populate('user');
+  // Only fetch relevant bookings
+  const bookings = await Book.find({
+    status: BookingStatus.PAID,
+    serviceEndDate: { $exists: true },
+  }).populate("user");
 
-        for (const booking of bookings) {
-            const daysLeft = Math.ceil((booking.serviceEndDate - now) / (1000 * 60 * 60 * 24));
+  const admins = await Admin.find({
+    fcmTokens: { $exists: true, $ne: [] },
+  }).select("fcmTokens");
 
-            // 1️⃣ Send reminder 3 days before expiration if not sent already
-            if (daysLeft === 3 && !booking.reminderSent) {
-                const user = booking.user;
-                if (!user) {
-                    console.error(`User not found for booking ${booking._id}`);
-                    continue;
-                }
+  const tokens = admins.flatMap(a => a.fcmTokens);
 
-                // Send email
-                await sendReminderEmail({
-                    name: user.fullname,
-                    email: user.email
-                });
+  for (const booking of bookings) {
+    if (!booking.user) continue;
 
-                // Notify admins
-                const admins = await Admin.find({ fcmTokens: { $exists: true, $ne: [] } }).select('fcmTokens');
-                const adminTokens = admins.flatMap(a => a.fcmTokens);
+    const daysLeft = Math.ceil(
+      (booking.serviceEndDate.getTime() - now.getTime()) / DAY
+    );
 
-                if (adminTokens.length) {
-                    await sendToTokens(
-                        adminTokens,
-                        'Service Expiration Reminder',
-                        `Booking for ${user.fullname} expires in 3 days.`,
-                        { bookingId: booking._id.toString() }
-                    );
-                }
+    console.log(
+      `[CRON] Booking ${booking._id} | daysLeft=${daysLeft} | reminderSent=${booking.reminderSent}`
+    );
 
-                booking.reminderSent = true;
-                await booking.save();
-            }
+    // 🔔 Send reminder (atomic)
+    if (daysLeft <= 3 && daysLeft > 0) {
+      const result = await Book.updateOne(
+        { _id: booking._id, reminderSent: false },
+        { $set: { reminderSent: true } }
+      );
 
-            // 2️⃣ Expire service if date passed
-            if (now >= booking.serviceEndDate) {
-                booking.status = 'expired';
-                await booking.save();
-            }
+      if (result.modifiedCount === 1) {
+        try {
+          await sendReminderEmail({
+            name: booking.user.fullname,
+            email: booking.user.email,
+          });
+
+          if (tokens.length) {
+            await sendToTokens(
+              tokens,
+              "Service Expiration Reminder",
+              `Booking expires in ${daysLeft} day(s).`,
+              { bookingId: booking._id.toString() }
+            );
+          }
+
+          console.log(`[CRON] Reminder sent for booking ${booking._id}`);
+        } catch (err) {
+          console.error(
+            `[CRON] Reminder failed for booking ${booking._id}`,
+            err
+          );
+
+          // rollback reminderSent on failure
+          await Book.updateOne(
+            { _id: booking._id },
+            { $set: { reminderSent: false } }
+          );
         }
-    } catch (err) {
-        console.error('Error in checkExpirations cron:', err.message);
+      }
     }
-};
 
-// Example: run every day at 12am
-cron.schedule('0 0 * * *', () => {
-    console.log('Running service expiration check...');
-    checkExpirations();
-});
+    // ⛔ Expire booking (atomic)
+    if (daysLeft <= 0) {
+      const result = await Book.updateOne(
+        { _id: booking._id, status: BookingStatus.PAID },
+        { $set: { status: BookingStatus.EXPIRED } }
+      );
+
+      if (result.modifiedCount === 1) {
+        console.log(`[CRON] Booking expired ${booking._id}`);
+      }
+    }
+  }
+
+  console.log("[CRON] Service expiration check complete");
+};
 
 module.exports = checkExpirations;
