@@ -14,18 +14,21 @@ const calculateBookingAmount = async (booking) => {
       ? rates.in_house_drivers
       : rates.freelance_drivers;
 
+  // normalize trip_type for lookup
+  const tripKey = booking.trip_type.replace("-", "_"); // "one-way" → "one_way"
+
   let amount = 0;
   switch (booking.schedule_type) {
     case "custom":
       if (!booking.number_of_days || booking.number_of_days <= 0)
         throw new Error("Invalid number of days for custom schedule");
-      amount = rateGroup.daily * booking.number_of_days;
+      amount = rateGroup.daily[tripKey] * booking.number_of_days;
       break;
     case "2 weeks":
-      amount = rateGroup.bi_weekly[booking.trip_type];
+      amount = rateGroup.bi_weekly[tripKey];
       break;
     case "1 month":
-      amount = rateGroup.monthly[booking.trip_type];
+      amount = rateGroup.monthly[tripKey];
       break;
     default:
       throw new Error("Invalid schedule type");
