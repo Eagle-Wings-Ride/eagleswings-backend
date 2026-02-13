@@ -14,14 +14,15 @@ const {calculateBookingAmount} = require('../utils/helpers/book.helpers')
 
 const endpointSecret = process.env.ENDPOINT_SECRET_PROD;
 
+const DAY = 24 * 60 * 60 * 1000;
+
+// STRIPE WEBHOOK CONTROLLER
+
 const stripeWebhook = async (req, res) => {
   const signature = req.headers["stripe-signature"];
   let event;
 
-  /**
-   * 1️⃣ Verify Stripe webhook signature
-   * Prevents forged requests
-   */
+  // 1️⃣ Verify Stripe signature
   try {
     event = stripe.webhooks.constructEvent(
       req.body,
@@ -29,14 +30,11 @@ const stripeWebhook = async (req, res) => {
       endpointSecret
     );
   } catch (err) {
-    console.error("Webhook signature verification failed:", err.message);
+    console.error("❌ Webhook signature verification failed:", err.message);
     return res.status(400).send("Invalid webhook signature");
   }
 
-  /**
-   * 2️⃣ Atomic idempotency lock
-   * Guarantees one-time execution per Stripe event
-   */
+  // 2️⃣ Idempotency protection (atomic lock)
   try {
     const existingEvent = await StripeEvent.findOneAndUpdate(
       { eventId: event.id },
@@ -48,222 +46,212 @@ const stripeWebhook = async (req, res) => {
       return res.json({ received: true });
     }
   } catch (err) {
-    console.error("Idempotency lock failed:", err);
+    console.error("❌ Idempotency lock failed:", err);
     return res.status(500).json({ error: "Webhook idempotency failure" });
   }
 
-  try {
-    switch (event.type) {
-      /**
-       * ============================
-       * PAYMENT SUCCESS
-       * ============================
-       */
-      case "checkout.session.completed": {
-        const session = event.data.object;
-        const bookingId = session.metadata?.bookingId;
-        const paymentType = session.metadata?.type || "new";
+  // 3️⃣ Respond to Stripe immediately (PREVENT TIMEOUT)
+  res.json({ received: true });
 
-        if (!bookingId) break;
-        if (session.payment_status !== "paid") break;
+  // 4️⃣ Process event asynchronously
+  processStripeEvent(event).catch((err) => {
+    console.error("❌ Async webhook processing error:", err);
+  });
+};
 
-        const booking = await Book.findById(bookingId).populate("user child");
-        if (!booking) break;
+//STRIPE EVENT PROCESSOR
 
-        // --- Amount Verification ---
-        const expectedAmount = await calculateBookingAmount(booking);
-        const paidAmount = session.amount_total / 100; // Stripe sends in cents
+const processStripeEvent = async (event) => {
+  switch (event.type) {
+    // PAYMENT SUCCESS
+    case "checkout.session.completed": {
+      const session = event.data.object;
+      const bookingId = session.metadata?.bookingId;
+      const paymentType = session.metadata?.type || "new";
 
-        if (paidAmount !== expectedAmount) {
-          console.error(
-            `Amount mismatch for booking ${bookingId}: expected ${expectedAmount}, paid ${paidAmount}`
+      if (!bookingId) return;
+      if (session.payment_status !== "paid") return;
+
+      const booking = await Book.findById(bookingId).populate("user child");
+      if (!booking) return;
+
+      // 🔎 Verify amount
+      const expectedAmount = await calculateBookingAmount(booking);
+      const paidAmount = session.amount_total / 100;
+
+      if (paidAmount !== expectedAmount) {
+        console.error(
+          `❌ Amount mismatch for booking ${bookingId}. Expected ${expectedAmount}, Paid ${paidAmount}`
+        );
+        return;
+      }
+
+      if (booking.status === BookingStatus.PAID) return;
+
+      booking.status = BookingStatus.PAID;
+      booking.reminderSent = false;
+
+      // Service Date Calculation
+      const now = new Date();
+      const serviceStartDate =
+        booking.serviceEndDate && booking.serviceEndDate >= now
+          ? new Date(booking.serviceEndDate.getTime() + DAY)
+          : now;
+
+      let newServiceEndDate = new Date(serviceStartDate);
+
+      if (booking.schedule_type === "custom") {
+        newServiceEndDate.setDate(
+          newServiceEndDate.getDate() + booking.number_of_days
+        );
+      } else if (booking.schedule_type === "2 weeks") {
+        newServiceEndDate.setDate(newServiceEndDate.getDate() + 14);
+      } else if (booking.schedule_type === "1 month") {
+        newServiceEndDate.setMonth(newServiceEndDate.getMonth() + 1);
+      }
+
+      // Renewal History
+      if (paymentType === "renewal") {
+        await BookingRenewalHistory.create({
+          booking: booking._id,
+          user: booking.user._id,
+          child: booking.child._id,
+          previousStartDate: booking.start_date,
+          previousEndDate: booking.serviceEndDate,
+          newStartDate: serviceStartDate,
+          newEndDate: newServiceEndDate,
+          paymentId: session.id,
+          amount: paidAmount,
+        });
+      }
+
+      booking.start_date = serviceStartDate;
+      booking.serviceEndDate = newServiceEndDate;
+
+      await booking.save();
+
+      // User Notifications
+      if (booking.user?.fcmTokens?.length) {
+        try {
+          await sendToTokens(
+            booking.user.fcmTokens,
+            paymentType === "renewal"
+              ? "Booking Renewed"
+              : "Payment Successful",
+            paymentType === "renewal"
+              ? `Your booking for ${booking.child.fullname} has been successfully renewed.`
+              : `Your payment for ${booking.child.fullname}'s ride was successful.`,
+            { bookingId: booking._id.toString() }
           );
-           break; // Do NOT mark as paid.
+        } catch (err) {
+          console.error("User push failed:", err.message);
         }
+      }
 
-        // Prevent double payment
-        if (booking.status === BookingStatus.PAID) break;
-
-        booking.status = BookingStatus.PAID;
-        booking.reminderSent = false;
-
-        /**
-         * Service end date calculation
-         */
-        const now = new Date();
-        const serviceStartDate = booking.serviceEndDate >= now 
-        ? new Date(booking.serviceEndDate.getTime() + DAY) // start counting the next day
-        : now;
-
-         // --- Calculate new end date ---
-        let newServiceEndDate = new Date(serviceStartDate);
-
-        if (booking.schedule_type === "custom") {
-          newServiceEndDate.setDate(
-            newServiceEndDate.getDate() + booking.number_of_days
-          );
-        } else if (booking.schedule_type === "2 weeks") {
-          newServiceEndDate.setDate(newServiceEndDate.getDate() + 14);
-        } else if (booking.schedule_type === "1 month") {
-          newServiceEndDate.setMonth(newServiceEndDate.getMonth() + 1);
-        }
-
-        // --- Save renewal history if applicable ---
+      // Emails
+      try {
         if (paymentType === "renewal") {
-          await BookingRenewalHistory.create({
-            booking: booking._id,
-            user: booking.user._id,
-            child: booking.child._id,
-            previousStartDate: booking.start_date,
-            previousEndDate: booking.serviceEndDate,
-            newStartDate: serviceStartDate,
-            newEndDate: newServiceEndDate,
-            paymentId: session.id,
-            amount: paidAmount,
+          await sendRenewalEmail({
+            name: booking.user.fullname,
+            email: booking.user.email,
+            newEndDate: newServiceEndDate.toDateString(),
+            bookingId: booking._id.toString(),
+          });
+        } else {
+          await sendRideRegistrationEmail({
+            name: booking.user.fullname,
+            email: booking.user.email,
+            childName: booking.child.fullname,
+            tripType: booking.trip_type,
+            scheduleType: booking.schedule_type,
           });
         }
-        console.log(BookingRenewalHistory)
-        booking.start_date = serviceStartDate;
-        booking.serviceEndDate = newServiceEndDate;
-        await booking.save();
+      } catch (err) {
+        console.error("Email sending failed:", err.message);
+      }
 
-        /**
-         * User push notification
-         */
-        if (booking.user?.fcmTokens?.length) {
-          try {
-            await sendToTokens(
-              booking.user.fcmTokens,
-              paymentType === "renewal"
-                ? "Booking Renewed"
-                : "Payment Successful",
-              paymentType === "renewal"
-                ? `Your booking for ${booking.child.fullname} has been successfully renewed.`
-                : `Your payment for ${booking.child.fullname}'s ride was successful.`,
-              { bookingId: booking._id.toString() }
-            );
-          } catch (err) {
-            console.error("User push notification failed:", err.message)
-          }
-        }
+      // Admin Notifications
+      const admins = await Admin.find({
+        role: "admin",
+        fcmTokens: { $exists: true, $ne: [] },
+      }).select("fcmTokens");
 
-        /**
-         * Email notification
-         */
+      const adminTokens = admins.flatMap((a) => a.fcmTokens);
+
+      if (adminTokens.length) {
         try {
-          if (paymentType === "renewal") {
-            await sendRenewalEmail({
-              name: booking.user.fullname,
-              email: booking.user.email,
-              newEndDate: booking.serviceEndDate.toDateString(),
-              bookingId: booking._id.toString(),
-            });
-          } else {
-            await sendRideRegistrationEmail({
-              name: booking.user.fullname,
-              email: booking.user.email,
-              childName: booking.child.fullname,
-              tripType: booking.trip_type,
-              scheduleType: booking.schedule_type,
-            });
-          }
+          await sendToTokens(
+            adminTokens,
+            paymentType === "renewal"
+              ? "Booking Renewed"
+              : "Payment Received",
+            paymentType === "renewal"
+              ? `Booking ${booking._id} for ${booking.child.fullname} has been renewed.`
+              : `Payment received for booking ${booking._id} (${booking.child.fullname}).`,
+            { bookingId: booking._id.toString() }
+          );
         } catch (err) {
-          console.error("Email sending failed:", err.message);
+          console.error("Admin push failed:", err.message);
         }
-
-        /**
-         * Admin notifications
-         */
-        const admins = await Admin.find({
-          role: "admin",
-          fcmTokens: { $exists: true, $ne: [] },
-        }).select("fcmTokens");
-
-        const adminTokens = admins.flatMap((a) => a.fcmTokens);
-
-        if (adminTokens.length) {
-          try {
-            await sendToTokens(
-              adminTokens,
-              paymentType === "renewal"
-                ? "Booking Renewed"
-                : "Payment Received",
-              paymentType === "renewal"
-                ? `Booking ${booking._id} for ${booking.child.fullname} has been renewed.`
-                : `Payment received for booking ${booking._id} (${booking.child.fullname}).`,
-              { bookingId: booking._id.toString() }
-            );
-          } catch (err) {
-            console.error("Admin push notification failed:", err.message)
-          }
-        }
-
-        break;
       }
 
-      /**
-       * ============================
-       * PAYMENT FAILED / EXPIRED
-       * ============================
-       */
-      case "checkout.session.async_payment_failed":
-      case "checkout.session.expired": {
-        const session = event.data.object;
-        const bookingId = session.metadata?.bookingId;
-        if (!bookingId) break;
-
-        const booking = await Book.findByIdAndUpdate(
-          bookingId,
-          { status: BookingStatus.FAILED },
-          { new: true }
-        ).populate("user child");
-
-        if (booking?.user?.fcmTokens?.length) {
-          try{
-            await sendToTokens(
-              booking.user.fcmTokens,
-              "Payment Failed",
-              `Your payment for ${booking.child.fullname}'s ride failed. Please retry.`,
-              { bookingId: booking._id.toString() }
-            );
-          } catch (err){
-            console.error("User failure notification failed:", err.message);
-          }
-        }
-
-        // Admin notification
-
-        const admins = await Admin.find({
-          role: "admin",
-          fcmTokens: { $exists: true, $ne: [] },
-        }).select("fcmTokens");
-
-        const adminTokens = admins.flatMap((a) => a.fcmTokens);
-
-        if (adminTokens.length) {
-          try {
-            await sendToTokens(
-              adminTokens,
-              "Payment Failed",
-              `Payment failed for booking ${booking._id} (${booking.child.fullname}).`,
-              { bookingId: booking._id.toString() }
-            );
-          } catch (err) {
-            console.error("Admin failure notification failed:", err.message);
-          }
-        }
-
-        break;
-      }
-
-      default:
-        console.log("Unhandled Stripe event:", event.type);
+      break;
     }
 
-    return res.json({ received: true });
-  } catch (err) {
-    console.error("Webhook processing error:", err);
-    return res.status(500).json({ error: "Webhook handler error" });
+
+    // PAYMENT FAILED
+    case "checkout.session.async_payment_failed":
+    case "checkout.session.expired": {
+      const session = event.data.object;
+      const bookingId = session.metadata?.bookingId;
+      if (!bookingId) return;
+
+      const booking = await Book.findByIdAndUpdate(
+        bookingId,
+        { status: BookingStatus.FAILED },
+        { new: true }
+      ).populate("user child");
+
+      if (!booking) return;
+
+      if (booking.user?.fcmTokens?.length) {
+        try {
+          await sendToTokens(
+            booking.user.fcmTokens,
+            "Payment Failed",
+            `Your payment for ${booking.child.fullname}'s ride failed. Please retry.`,
+            { bookingId: booking._id.toString() }
+          );
+        } catch (err) {
+          console.error("User failure push failed:", err.message);
+        }
+      }
+
+      const admins = await Admin.find({
+        role: "admin",
+        fcmTokens: { $exists: true, $ne: [] },
+      }).select("fcmTokens");
+
+      const adminTokens = admins.flatMap((a) => a.fcmTokens);
+
+      if (adminTokens.length) {
+        try {
+          await sendToTokens(
+            adminTokens,
+            "Payment Failed",
+            `Payment failed for booking ${booking._id} (${booking.child.fullname}).`,
+            { bookingId: booking._id.toString() }
+          );
+        } catch (err) {
+          console.error("Admin failure push failed:", err.message);
+        }
+      }
+
+      break;
+    }
+
+    default:
+      console.log("Unhandled Stripe event:", event.type);
   }
 };
 
