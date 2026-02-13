@@ -198,7 +198,9 @@ const makePayment = async (req, res) => {
 
   try {
     // 🔎 Find booking
-    const booking = await Book.findById(bookingId).populate("user", "email");
+    const booking = await Book.findById(bookingId)
+                  .populate("user", "email")
+                  .populate("child", "fullname");
     if (!booking) {
       return res.status(404).json({ message: "Booking not found" });
     }
