@@ -18,6 +18,8 @@ const AssignmentSchema = new Schema({
     enum: ['pending', 'accepted', 'rejected', 'in_progress', 'completed','cancelled' ],
     default: 'pending',
   },
+  pickupNotified: { type: Boolean, default: false },
+  dropoffNotified: { type: Boolean, default: false },
   shift: { 
     type: String,
     enum: ['morning','afternoon'],
@@ -27,15 +29,8 @@ const AssignmentSchema = new Schema({
     type: Schema.Types.ObjectId,
     ref: 'Admin',  // which admin assigned it
   },
-  createdAt: {
-    type: Date,
-    default: Date.now,
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now,
-  },
-});
+  }, {timestamps: true}
+);
 
 // Auto-update updatedAt on save
 AssignmentSchema.pre('save', function (next) {
