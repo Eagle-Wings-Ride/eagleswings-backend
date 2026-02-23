@@ -125,6 +125,11 @@ const updateChild = async (req, res) => {
     const updates = { ...req.body };
     delete updates.user;
 
+     // Prevent normal users from editing daycare address
+    if (!isAdmin) {
+      delete updates.daycare_address;
+    }
+
     if (req.file) {
       // Delete old image if present
       if (child.image_public_id) {
@@ -141,8 +146,6 @@ const updateChild = async (req, res) => {
       const uploadedFile = await uploadToCloudinary(req.file, "children");
       updates.image = uploadedFile.url;
       updates.image_public_id = uploadedFile.public_id;
-      console.log("New", updates.image_public_id);
-
     }
 
     const updatedChild = await Child.findByIdAndUpdate(id, updates, {

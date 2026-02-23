@@ -2,10 +2,13 @@ const express = require("express")
 const router = express.Router()
 const authenticateToken = require('../middleware/authenticateToken')
 
-const {bookRide, getRidesByUser, getRideByChild, getAllRides, getRecentRides, getRidesByStatus, updateRideStatus, makePayment, renewBooking} = require('../controllers/bookCtrl')
+const {bookRide, editRide, getRidesByUser, getRideByChild, getAllRides, getRecentRides, getRidesByStatus, updateRideStatus, makePayment, renewBooking} = require('../controllers/bookCtrl')
 
 //Booking routes
 router.route('/:id').post(authenticateToken, bookRide)
+
+// Edit an existing ride
+router.patch('/edit/:rideId', authenticateToken, editRide) 
 
 // Route to get rides by user
 router.get('/rides/', authenticateToken, getRidesByUser)

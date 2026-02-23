@@ -4,7 +4,10 @@ const Book = require("../models/Book");
 const Child = require("../models/Child");
 const Admin = require("../models/Admin");
 const Assignment = require("../models/Assignment");
-const { calculateBookingAmount, getStripeProductData } = require("../utils/helpers/book.helpers");
+const {
+  calculateBookingAmount,
+  getStripeProductData,
+} = require("../utils/helpers/book.helpers");
 const { sendToTokens } = require("../utils/pushNotifications");
 const {
   validateStartDate,
@@ -19,7 +22,6 @@ const {
   BookingStatus,
   DaysOfWeek,
 } = require("../utils/bookingEnum");
-
 
 // Book ride
 const bookRide = async (req, res) => {
@@ -199,8 +201,8 @@ const makePayment = async (req, res) => {
   try {
     // 🔎 Find booking
     const booking = await Book.findById(bookingId)
-                  .populate("user", "email")
-                  .populate("child", "fullname");
+      .populate("user", "email")
+      .populate("child", "fullname");
     if (!booking) {
       return res.status(404).json({ message: "Booking not found" });
     }
@@ -249,8 +251,8 @@ const makePayment = async (req, res) => {
         type: "new",
       },
       customer_email: booking.user.email,
-      success_url: `${process.env.CHECKOUT_URL}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.CHECKOUT_URL}/payment-cancelled`,
+      success_url: `eaglesride://app/payment?reference={CHECKOUT_SESSION_ID}&status=success&type=new`,
+      cancel_url: `eaglesride://app/payment?reference={CHECKOUT_SESSION_ID}&status=cancel&type=new`,
     });
 
     return res.status(200).json({
@@ -304,9 +306,7 @@ const renewBooking = async (req, res) => {
     }
 
     const now = new Date();
-    const daysLeft = Math.ceil(
-      (booking.serviceEndDate - now) / DAY
-    );
+    const daysLeft = Math.ceil((booking.serviceEndDate - now) / DAY);
 
     if (daysLeft > 3) {
       return res.status(400).json({
@@ -318,7 +318,9 @@ const renewBooking = async (req, res) => {
     const amount = await calculateBookingAmount(booking);
 
     if (!amount || isNaN(amount)) {
-      throw new Error("Booking amount is invalid, cannot create Stripe session");
+      throw new Error(
+        "Booking amount is invalid, cannot create Stripe session"
+      );
     }
 
     // Get product data for Stripe
@@ -344,8 +346,8 @@ const renewBooking = async (req, res) => {
         type: "renewal",
       },
       customer_email: booking.user.email,
-      success_url: `${process.env.CHECKOUT_URL}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.CHECKOUT_URL}/payment-cancelled`,
+      success_url: `eaglesride://app/payment?reference={CHECKOUT_SESSION_ID}&status=success&type=renewal`,
+      cancel_url: `eaglesride://app/payment?reference={CHECKOUT_SESSION_ID}&status=cancel&type=renewal`,
     });
 
     return res.status(200).json({
@@ -359,7 +361,6 @@ const renewBooking = async (req, res) => {
     });
   }
 };
-
 
 // find all rides created by the user
 const getRidesByUser = async (req, res) => {
@@ -590,6 +591,116 @@ const getRidesByStatus = async (req, res) => {
   }
 };
 
+//Update/ Edit Ride Information
+const editRide = async (req, res) => {
+  try {
+    const { rideId } = req.params;
+
+    if (!req.user?.userId) {
+      return res.status(401).json({ message: "User not authenticated" });
+    }
+
+    const ride = await Book.findById(rideId).populate("child");
+
+    if (!ride) {
+      return res.status(404).json({ message: "Ride not found" });
+    }
+
+    const isOwner = ride.user.toString() === req.user.userId;
+    const isAdmin = req.user.role === "admin";
+
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    // Statuses Guard
+    if (!isAdmin) {
+      switch (ride.status) {
+        case BookingStatus.BOOKED:
+        case BookingStatus.FAILED:
+          break; // continue
+        default:
+          return res.status(400).json({
+            message: "Ride cannot be edited after payment",
+          });
+      }
+    }
+
+    const updates = { ...req.body };
+
+    // Delete protected fields
+    delete updates.user;
+    delete updates.child;
+    delete updates.status;
+    delete updates.serviceEndDate;
+    delete updates.reminderSent;
+    delete updates.cancellationDate;
+    delete updates.cancellationReason;
+
+    // Validate Enums
+    if (updates.ride_type) {
+      if (!["freelance", "inhouse"].includes(updates.ride_type)) {
+        return res.status(400).json({ message: "Invalid ride type" });
+      }
+    }
+
+    if (updates.trip_type) {
+      if (!["one-way", "return"].includes(updates.trip_type)) {
+        return res.status(400).json({ message: "Invalid trip type" });
+      }
+    }
+
+    if (updates.schedule_type) {
+      if (!["2 weeks", "1 month"].includes(updates.schedule_type)) {
+        return res.status(400).json({ message: "Invalid schedule type" });
+      }
+    }
+
+    // Address Remapping
+    const child = ride.child;
+
+    const getAddress = (label) => {
+      switch (label) {
+        case "home":
+          return child.home_address;
+        case "school":
+          return child.school_address;
+        case "daycare":
+          return child.daycare_address;
+        default:
+          return null;
+      }
+    };
+
+    if (updates.morning_from) {
+      updates.morning_from_address = getAddress(updates.morning_from);
+    }
+    if (updates.morning_to) {
+      updates.morning_to_address = getAddress(updates.morning_to);
+    }
+
+    if (updates.afternoon_from) {
+      updates.afternoon_from_address = getAddress(updates.afternoon_from);
+    }
+    if (updates.afternoon_to) {
+      updates.afternoon_to_address = getAddress(updates.afternoon_to);
+    }
+
+    const updatedRide = await Book.findByIdAndUpdate(rideId, updates, {
+      new: true,
+      runValidators: true,
+    });
+
+    res.status(200).json({
+      message: "Ride updated successfully",
+      ride: updatedRide,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(400).json({ message: error.message });
+  }
+};
+
 const updateRideStatus = async (req, res) => {
   try {
     const { rideId } = req.params;
@@ -616,7 +727,9 @@ const updateRideStatus = async (req, res) => {
     // check if user is admin
     const admin = await Admin.findById(req.user.userId);
     if (!admin) {
-      return res.status(403).json({ message: "Only admins can update ride status" });
+      return res
+        .status(403)
+        .json({ message: "Only admins can update ride status" });
     }
 
     // Find the ride and update its status
@@ -646,6 +759,7 @@ const updateRideStatus = async (req, res) => {
 
 module.exports = {
   bookRide,
+  editRide,
   makePayment,
   renewBooking,
   getRidesByUser,
