@@ -29,8 +29,10 @@ const checkExpirations = async () => {
       (booking.serviceEndDate.getTime() - now.getTime()) / DAY
     );
 
+    // Use only the last 6 characters of the booking ID
+    const shortId = booking._id.toString().slice(-6);
     console.log(
-      `[CRON] Booking ${booking._id} | daysLeft=${daysLeft} | reminderSent=${booking.reminderSent}`
+      `[CRON] Booking ${shortId} | daysLeft=${daysLeft} | reminderSent=${booking.reminderSent}`
     );
 
     // 🔔 Send reminder (atomic)
@@ -52,14 +54,14 @@ const checkExpirations = async () => {
               tokens,
               "Service Expiration Reminder",
               `Booking expires in ${daysLeft} day(s).`,
-              { bookingId: booking._id.toString() }
+              { bookingId: shortId }
             );
           }
 
-          console.log(`[CRON] Reminder sent for booking ${booking._id}`);
+          console.log(`[CRON] Reminder sent for booking ${shortId}`);
         } catch (err) {
           console.error(
-            `[CRON] Reminder failed for booking ${booking._id}`,
+            `[CRON] Reminder failed for booking ${shortId}`,
             err
           );
 
@@ -80,7 +82,7 @@ const checkExpirations = async () => {
       );
 
       if (result.modifiedCount === 1) {
-        console.log(`[CRON] Booking expired ${booking._id}`);
+        console.log(`[CRON] Booking expired ${shortId}`);
       }
     }
   }
