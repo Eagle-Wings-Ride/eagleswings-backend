@@ -91,7 +91,7 @@ const sendReminderEmail = async ({ name, email}) => {
         <p>If you’ve already renewed, you can safely ignore this message.</p>
       </div>
       <div class="footer">
-        &copy; 2025 Eagles Wings Ride. All rights reserved.<br>
+        &copy; 2026 Eagles Wings Ride. All rights reserved.<br>
         <a href="https://eagleswingsride.com">Visit our website</a>
       </div>
     </div>
