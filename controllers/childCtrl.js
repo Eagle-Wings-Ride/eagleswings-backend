@@ -1,5 +1,5 @@
 const { Model } = require("mongoose");
-const Book = require("../models/Book")
+const Book = require("../models/Bookings")
 const Child = require("../models/Child");
 const Admin = require("../models/Admin");
 const cloudinary = require('../cloudinary/cloudinaryconfig');

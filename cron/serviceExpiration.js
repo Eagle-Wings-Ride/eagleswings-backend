@@ -1,8 +1,9 @@
-const Book = require("../models/Book");
+const Book = require("../models/Bookings");
 const Admin = require("../models/Admin");
 const { sendToTokens } = require("../utils/pushNotifications");
 const sendReminderEmail = require("../utils/sendReminderEmail");
 const { BookingStatus } = require("../utils/bookingEnum");
+const { remainingServiceDays } = require("../utils/helpers/schedule.helpers");
 
 const DAY = 1000 * 60 * 60 * 24;
 
@@ -12,7 +13,7 @@ const checkExpirations = async () => {
 
   // Only fetch relevant bookings
   const bookings = await Book.find({
-    status: BookingStatus.PAID,
+    status:BookingStatus.PAID,
     serviceEndDate: { $exists: true },
   }).populate("user");
 
@@ -20,26 +21,24 @@ const checkExpirations = async () => {
     fcmTokens: { $exists: true, $ne: [] },
   }).select("fcmTokens");
 
-  const tokens = admins.flatMap(a => a.fcmTokens);
+  const tokens = admins.flatMap((a) => a.fcmTokens);
 
   for (const booking of bookings) {
     if (!booking.user) continue;
 
-    const daysLeft = Math.ceil(
-      (booking.serviceEndDate.getTime() - now.getTime()) / DAY
-    );
+    const daysLeft = remainingServiceDays(booking);
 
     // Use only the last 6 characters of the booking ID
     const shortId = booking._id.toString().slice(-6);
     console.log(
-      `[CRON] Booking ${shortId} | daysLeft=${daysLeft} | reminderSent=${booking.reminderSent}`
+      `[CRON] Booking ${shortId} | daysLeft=${daysLeft} | reminderSent=${booking.reminderSent}`,
     );
 
     // 🔔 Send reminder (atomic)
     if (daysLeft <= 3 && daysLeft > 0) {
       const result = await Book.updateOne(
         { _id: booking._id, reminderSent: false },
-        { $set: { reminderSent: true } }
+        { $set: { reminderSent: true } },
       );
 
       if (result.modifiedCount === 1) {
@@ -53,22 +52,19 @@ const checkExpirations = async () => {
             await sendToTokens(
               tokens,
               "Service Expiration Reminder",
-              `Booking expires in ${daysLeft} day(s).`,
-              { bookingId: shortId }
+              `Booking expires in ${daysLeft} ride day(s).`,
+              { bookingId: shortId },
             );
           }
 
           console.log(`[CRON] Reminder sent for booking ${shortId}`);
         } catch (err) {
-          console.error(
-            `[CRON] Reminder failed for booking ${shortId}`,
-            err
-          );
+          console.error(`[CRON] Reminder failed for booking ${shortId}`, err);
 
           // rollback reminderSent on failure
           await Book.updateOne(
             { _id: booking._id },
-            { $set: { reminderSent: false } }
+            { $set: { reminderSent: false } },
           );
         }
       }
@@ -77,8 +73,15 @@ const checkExpirations = async () => {
     // ⛔ Expire booking (atomic)
     if (daysLeft <= 0) {
       const result = await Book.updateOne(
-        { _id: booking._id, status: BookingStatus.PAID },
-        { $set: { status: BookingStatus.EXPIRED } }
+        {
+          _id: booking._id,
+          status: BookingStatus.PAID,
+        },
+        {
+          $set: {
+            status: BookingStatus.EXPIRED,
+          },
+        },
       );
 
       if (result.modifiedCount === 1) {
