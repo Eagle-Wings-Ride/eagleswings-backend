@@ -10,8 +10,13 @@ const {
   logoutUser,
   verifyUserOTP,
   resendOTP,
+  requestPasswordReset,
+  verifyPasswordResetOTP,
+  resendPasswordResetOTP,
   forgotPassword,
+  changePassword
 } = require("../controllers/auth/userAuthCtrl");
+
 const {
   getAllUsers,
   getUser,
@@ -19,6 +24,7 @@ const {
   updateUser,
   deleteUser,
 } = require("../controllers/userCtrl");
+
 const {
   addChild,
   getChild,
@@ -35,14 +41,21 @@ router
   .get(authenticateToken, getUser)
   .patch(authenticateToken, updateUser)
   .delete(authenticateToken, deleteUser);
+
 router.route("/register").post(generateOTPAndExpiry, registerUser);
-router.route("/verify-mail").post(verifyUserOTP);
-router.route("/resend-otp").post(generateOTPAndExpiry, resendOTP);
-router
-  .route("/forgot-password")
-  .post(authenticateToken, generateOTPAndExpiry, forgotPassword);
 router.route("/login").post(loginUser);
 router.route("/logout").post(authenticateToken, logoutUser);
+
+router.route("/verify-mail").post(verifyUserOTP);
+router.route("/resend-otp").post(generateOTPAndExpiry, resendOTP);
+
+router.post("/change-password", authenticateToken, changePassword);
+router.post('/password-reset/request', generateOTPAndExpiry, requestPasswordReset);
+router.post('/password-reset/resend', generateOTPAndExpiry, resendPasswordResetOTP);
+router.route("/password-reset/verify").post(verifyPasswordResetOTP);
+router
+  .route("/password-reset/forgot-password")
+  .post(generateOTPAndExpiry, forgotPassword);
 
 // Children Routes
 router

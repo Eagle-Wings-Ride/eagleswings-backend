@@ -1,6 +1,6 @@
 const { Model } = require("mongoose");
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
-const Book = require("../models/Book");
+const Book = require("../models/Bookings");
 const Child = require("../models/Child");
 const Admin = require("../models/Admin");
 const Assignment = require("../models/Assignment");
@@ -700,7 +700,7 @@ const editRide = async (req, res) => {
     res.status(400).json({ message: error.message });
   }
 };
-
+/* Not needed for now, but can be used in the future if we want to allow admins to update ride status directly
 const updateRideStatus = async (req, res) => {
   try {
     const { rideId } = req.params;
@@ -756,7 +756,7 @@ const updateRideStatus = async (req, res) => {
     });
   }
 };
-
+*/
 module.exports = {
   bookRide,
   editRide,
@@ -768,5 +768,4 @@ module.exports = {
   getAllPaidUsers,
   getRecentRides,
   getRidesByStatus,
-  updateRideStatus,
 };

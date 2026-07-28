@@ -70,19 +70,19 @@ const BookSchema = new Schema(
 
     // Location coordinates
     start_latitude: {
-      type: String,
+      type: Number,
       required: true,
     },
     start_longitude: {
-      type: String,
+      type: Number,
       required: true,
     },
     end_latitude: {
-      type: String,
+      type: Number,
       required: true,
     },
     end_longitude: {
-      type: String,
+      type: Number,
       required: true,
     },
 
@@ -92,9 +92,7 @@ const BookSchema = new Schema(
         "booked",
         "paid",
         "assigned",
-        "ongoing",
         "payment_failed",
-        "completed",
         "cancelled",
         "expired",
       ],
@@ -114,6 +112,7 @@ const BookSchema = new Schema(
       ref: "Child",
       required: true,
     },
+    serviceStartDate: Date,
     serviceEndDate: {
       type: Date,
       required: false,

@@ -31,7 +31,7 @@ const sendRenewalEmail = async ({ name, email, newEndDate, bookingId }) => {
           <p>Please ensure timely payments to continue enjoying your ride services.</p>
         </div>
         <div class="footer">
-          &copy; 2025 Eagles Wings Ride. All rights reserved.
+          &copy; 2026 Eagles Wings Ride. All rights reserved.
         </div>
       </div>
     </body>

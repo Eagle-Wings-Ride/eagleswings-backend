@@ -32,7 +32,7 @@ const sendRideRegistrationEmail = async ({ name, email, childName, tripType, sch
           <p>You will be notified once a driver has been assigned.</p>
         </div>
         <div class="footer">
-          &copy; 2025 Eagles Wings Ride. All rights reserved.
+          &copy; 2026 Eagles Wings Ride. All rights reserved.
         </div>
       </div>
     </body>

@@ -271,7 +271,7 @@ const sendVerificationEmail = async ({ name, email, otp, type}) => {
         <!-- Footer -->
         <div class="footer">
           <p>If you didn't request this, you can safely ignore this email.</p>
-          <p>&copy; 2025 Eagles Wings Ride. All rights reserved.</p>
+          <p>&copy; 2026 Eagles Wings Ride. All rights reserved.</p>
         </div>
       </div>
     </body>
