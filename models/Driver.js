@@ -1,4 +1,4 @@
-const { mongoose } = require('mongoose')
+const mongoose  = require('mongoose')
 const { Schema } = mongoose
 const bcrypt = require('bcryptjs');
 
@@ -39,6 +39,7 @@ const DriverSchema = new Schema({
     criminal_check_rec: String,
     child_intervention_rec: String,
     driver_abstract: String,
+    inspection_report: String,
 
     // Verification status
     isEmailVerified: {
@@ -72,12 +73,7 @@ const DriverSchema = new Schema({
 
     // Notifications
     fcmTokens: { type: [String], default: [] },
-
-    createdAt: {
-        type: Date,
-        default: Date.now
-    }
-});
+}, {timestamps:true});
 
 
 DriverSchema.pre('save', async function () {

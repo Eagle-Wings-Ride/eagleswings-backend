@@ -32,12 +32,11 @@ const UserSchema = new Schema({
     },
     otp: String,
     otpExpiry: Date,
+    passwordResetOTP: String,
+    passwordResetExpiry: Date,
+    passwordResetVerified: { type: Boolean, default: false },
     fcmTokens: { type: [String], default: [] },
-    createdAt: {
-      type: Date,
-      default: Date.now() 
-    }
-  });
+  }, {timestamps: true});
 
 
   UserSchema.pre('save', async function () {
