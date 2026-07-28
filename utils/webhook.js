@@ -4,13 +4,14 @@ const { sendToTokens } = require("./pushNotifications");
 const sendRideRegistrationEmail = require("./sendRegistrationEmail");
 const sendRenewalEmail = require("./sendRenewalEmail");
 
-const Book = require("../models/Book");
+const Book = require("../models/Bookings");
 const Admin = require("../models/Admin");
-const BookingRenewalHistory = require("../models/bookingHistory")
+const BookingRenewalHistory = require("../models/bookingHistory");
 const StripeEvent = require("../models/stripeEvent");
 
 const { BookingStatus } = require("../utils/bookingEnum");
-const {calculateBookingAmount} = require('../utils/helpers/book.helpers')
+const { calculateBookingAmount } = require("../utils/helpers/book.helpers");
+const { calculateServiceDates } = require("../utils/helpers/schedule.helpers");
 
 const endpointSecret = process.env.ENDPOINT_SECRET_PROD;
 
@@ -24,11 +25,7 @@ const stripeWebhook = async (req, res) => {
 
   // 1️⃣ Verify Stripe signature
   try {
-    event = stripe.webhooks.constructEvent(
-      req.body,
-      signature,
-      endpointSecret
-    );
+    event = stripe.webhooks.constructEvent(req.body, signature, endpointSecret);
   } catch (err) {
     console.error("❌ Webhook signature verification failed:", err.message);
     return res.status(400).send("Invalid webhook signature");
@@ -39,7 +36,7 @@ const stripeWebhook = async (req, res) => {
     const existingEvent = await StripeEvent.findOneAndUpdate(
       { eventId: event.id },
       { eventId: event.id },
-      { upsert: true, new: false }
+      { upsert: true, new: false },
     );
 
     if (existingEvent) {
@@ -81,34 +78,45 @@ const processStripeEvent = async (event) => {
 
       if (paidAmount !== expectedAmount) {
         console.error(
-          `❌ Amount mismatch for booking ${bookingId}. Expected ${expectedAmount}, Paid ${paidAmount}`
+          `❌ Amount mismatch for booking ${bookingId}. Expected ${expectedAmount}, Paid ${paidAmount}`,
         );
         return;
       }
 
-      if (booking.status === BookingStatus.PAID) return;
+      if (paymentType === "new" && booking.status === BookingStatus.PAID)
+        return;
 
       booking.status = BookingStatus.PAID;
       booking.reminderSent = false;
 
-      // Service Date Calculation
-      const now = new Date();
-      const serviceStartDate =
-        booking.serviceEndDate && booking.serviceEndDate >= now
-          ? new Date(booking.serviceEndDate.getTime() + DAY)
-          : now;
+      // ---------------- SERVICE DATES ----------------
 
-      let newServiceEndDate = new Date(serviceStartDate);
+      // New booking uses the parent's chosen start date.
+      // Renewal starts the day after the previous service ends.
 
-      if (booking.schedule_type === "custom") {
-        newServiceEndDate.setDate(
-          newServiceEndDate.getDate() + booking.number_of_days
-        );
-      } else if (booking.schedule_type === "2 weeks") {
-        newServiceEndDate.setDate(newServiceEndDate.getDate() + 14);
-      } else if (booking.schedule_type === "1 month") {
-        newServiceEndDate.setMonth(newServiceEndDate.getMonth() + 1);
+      let calculatedStartDate;
+
+      if (paymentType === "renewal") {
+        calculatedStartDate =
+          booking.serviceEndDate && booking.serviceEndDate > new Date()
+            ? new Date(booking.serviceEndDate.getTime() + DAY)
+            : new Date();
+      } else {
+        calculatedStartDate = booking.start_date;
       }
+
+      const { serviceStartDate, serviceEndDate } = calculateServiceDates(
+        booking,
+        calculatedStartDate,
+      );
+
+      const previousStartDate = booking.start_date;
+      const previousEndDate = booking.serviceEndDate;
+
+      
+      booking.serviceStartDate = serviceStartDate;
+      booking.serviceEndDate = serviceEndDate;
+      booking.reminderSent = false;
 
       // Renewal History
       if (paymentType === "renewal") {
@@ -116,17 +124,14 @@ const processStripeEvent = async (event) => {
           booking: booking._id,
           user: booking.user._id,
           child: booking.child._id,
-          previousStartDate: booking.start_date,
-          previousEndDate: booking.serviceEndDate,
+          previousStartDate,
+          previousEndDate,
           newStartDate: serviceStartDate,
-          newEndDate: newServiceEndDate,
+          newEndDate: serviceEndDate,
           paymentId: session.id,
           amount: paidAmount,
         });
       }
-
-      booking.start_date = serviceStartDate;
-      booking.serviceEndDate = newServiceEndDate;
 
       await booking.save();
 
@@ -141,7 +146,7 @@ const processStripeEvent = async (event) => {
             paymentType === "renewal"
               ? `Your booking for ${booking.child.fullname} has been successfully renewed.`
               : `Your payment for ${booking.child.fullname}'s ride was successful.`,
-            { bookingId: booking._id.toString() }
+            { bookingId: booking._id.toString() },
           );
         } catch (err) {
           console.error("User push failed:", err.message);
@@ -154,7 +159,7 @@ const processStripeEvent = async (event) => {
           await sendRenewalEmail({
             name: booking.user.fullname,
             email: booking.user.email,
-            newEndDate: newServiceEndDate.toDateString(),
+            newEndDate: serviceEndDate.toDateString(),
             bookingId: booking._id.toString(),
           });
         } else {
@@ -182,13 +187,11 @@ const processStripeEvent = async (event) => {
         try {
           await sendToTokens(
             adminTokens,
-            paymentType === "renewal"
-              ? "Booking Renewed"
-              : "Payment Received",
+            paymentType === "renewal" ? "Booking Renewed" : "Payment Received",
             paymentType === "renewal"
               ? `Booking ${booking._id} for ${booking.child.fullname} has been renewed.`
               : `Payment received for booking ${booking._id} (${booking.child.fullname}).`,
-            { bookingId: booking._id.toString() }
+            { bookingId: booking._id.toString() },
           );
         } catch (err) {
           console.error("Admin push failed:", err.message);
@@ -197,7 +200,6 @@ const processStripeEvent = async (event) => {
 
       break;
     }
-
 
     // PAYMENT FAILED
     case "checkout.session.async_payment_failed":
@@ -209,7 +211,7 @@ const processStripeEvent = async (event) => {
       const booking = await Book.findByIdAndUpdate(
         bookingId,
         { status: BookingStatus.FAILED },
-        { new: true }
+        { new: true },
       ).populate("user child");
 
       if (!booking) return;
@@ -220,7 +222,7 @@ const processStripeEvent = async (event) => {
             booking.user.fcmTokens,
             "Payment Failed",
             `Your payment for ${booking.child.fullname}'s ride failed. Please retry.`,
-            { bookingId: booking._id.toString() }
+            { bookingId: booking._id.toString() },
           );
         } catch (err) {
           console.error("User failure push failed:", err.message);
@@ -240,7 +242,7 @@ const processStripeEvent = async (event) => {
             adminTokens,
             "Payment Failed",
             `Payment failed for booking ${booking._id} (${booking.child.fullname}).`,
-            { bookingId: booking._id.toString() }
+            { bookingId: booking._id.toString() },
           );
         } catch (err) {
           console.error("Admin failure push failed:", err.message);
