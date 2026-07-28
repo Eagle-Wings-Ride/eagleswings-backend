@@ -1,4 +1,4 @@
-const DriverShift = require("../../models/DriverShift");
+const DriverShift = require("../../models/driverShift");
 const Assignment = require("../../models/Assignment");
 
 // ---------------- CALCULATE BUSINESS DATES ----------------
