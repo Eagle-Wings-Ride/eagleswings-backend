@@ -12,13 +12,10 @@ const {registerDriver,
 
 const {getAllDrivers,
        getDriver,
-       driverAcceptRide,
-       driverRejectRide,
        updateDriver,
        deleteDriver,
        uploadDriverDetails,
        viewRides} = require('../controllers/driverCtrl')
-
 
 // Driver Auth Routes
 
@@ -36,8 +33,6 @@ router.route('/viewRides').get(authenticateToken, viewRides)
 router.route('/:id').get(authenticateToken, getDriver)
                      .patch(authenticateToken, updateDriver)
                      .delete(authenticateToken, deleteDriver)
-router.route('/:assignmentId/accept').patch(authenticateToken, driverAcceptRide)
-router.route('/:assignmentId/reject').patch(authenticateToken, driverRejectRide)
 
 router.route('/upload-details/:id').patch(authenticateToken, 
                                           upload.fields([
@@ -47,7 +42,8 @@ router.route('/upload-details/:id').patch(authenticateToken,
                                                  { name: "government_issued_id", maxCount: 2 },
                                                  { name: "criminal_check_rec", maxCount: 2 },
                                                  { name: "child_intervention_rec", maxCount: 2 },
-                                                 { name: "driver_abstract", maxCount: 2 }
+                                                 { name: "driver_abstract", maxCount: 2 },
+                                                 { name: "inspection_report", maxCount: 2 }
                                           ]), 
                                           uploadDriverDetails)
 

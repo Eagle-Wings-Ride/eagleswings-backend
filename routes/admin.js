@@ -5,6 +5,7 @@ const authenticateToken = require('../middleware/authenticateToken')
 
 const {registerAdmin, loginAdmin, verifyAdminOTP, resendAdminOTP} = require('../controllers/auth/adminAuthCtrl')
 const {approveDriver, assignDriverToRide, UnassignDriverFromRide} = require('../controllers/adminCtrl')
+const { getDriverHistory} = require("../controllers/driverHistoryCtrl");
 
 // AUTH URL
 
@@ -16,6 +17,7 @@ router.route('/resend-otp').post(generateOTPAndExpiry,resendAdminOTP)
 router.route('/approve-driver/:id').patch(authenticateToken, approveDriver)
 router.route('/bookings/:bookingId/assign-driver').patch(authenticateToken, assignDriverToRide)
 router.route('/bookings/:bookingId/unassign-driver').patch(authenticateToken, UnassignDriverFromRide)
+router.route("/history/:driverId").get(authenticateToken, getDriverHistory);
 
 // router.route('/driver/location/').get(authenticateToken, getDriverByLocation)
 
