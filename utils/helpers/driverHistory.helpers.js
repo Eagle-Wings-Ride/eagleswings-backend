@@ -1,4 +1,4 @@
-const DriverHistory = require("../../models/DriverHistory");
+const DriverHistory = require("../../models/driverHistory");
 
 const HOURLY_RATE = parseFloat(process.env.HOURLY_RATE || 12);
 const TAX_PERCENT = parseFloat(process.env.TAX_PERCENT || 0);
