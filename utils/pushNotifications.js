@@ -1,4 +1,4 @@
-// utils/notifications.js
+// utils/pushNotifications.js
 const admin = require('../firebaseAdmin');
 const User = require('../models/User'); // your mongoose model
 
