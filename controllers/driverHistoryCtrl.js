@@ -1,4 +1,4 @@
-const DriverHistory = require("../models/DriverHistory");
+const DriverHistory = require("../models/driverHistory");
 
 // ---------------- MY HISTORY ----------------
 
