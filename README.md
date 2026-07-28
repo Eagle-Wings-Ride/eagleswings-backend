@@ -58,9 +58,6 @@ STRIPE_PUBLISHABLE_KEY=your_stripe_publishable_key
 CLOUDINARY_CLOUD_NAME=your_cloud_name
 CLOUDINARY_API_KEY=your_api_key
 CLOUDINARY_API_SECRET=your_api_secret
-DAILY_RATE=20.00
-BI_WEEKLY_RATE=230.00
-MONTHLY_RATE=420.00
 JWT_SECRET=your_jwt_secret
 📬 Webhook (Stripe)
 Stripe webhook endpoint to update ride status on payment events:
@@ -98,6 +95,7 @@ Ensure .env and database is connected correctly set up before running.
 Backend Hosted On: Railway
 
 Can be consumed by mobile or web frontend clients via public API.
+https://documenter.getpostman.com/view/31378438/2sAYJ3EgfP#9ab7320f-f9fe-43e0-b620-ce3ec925d5ec
 
 🙏 Acknowledgements
 Built with 💙 for families and safe transportation of children.
