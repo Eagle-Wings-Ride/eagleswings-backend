@@ -1,91 +1,168 @@
 const Rates = require("../../models/Rate");
 
-const MAX_DAYS_AHEAD = 90; // 3 months
-const MAX_DAYS_PAST = 1; // timezone tolerance
+const MAX_DAYS_AHEAD = 90;
+const MAX_DAYS_PAST = 1;
 const MAX_CUSTOM_DAYS = 60;
 
-// 💰 Validate and compute amount
+/**
+ * ---------------------------
+ * BOOKING AMOUNT
+ * ---------------------------
+ */
 const calculateBookingAmount = async (booking) => {
   const rates = await Rates.findOne();
-  if (!rates) throw new Error("Rate configuration missing");
+
+  if (!rates) {
+    throw new Error("Rate configuration missing");
+  }
 
   const rateGroup =
     booking.ride_type === "inhouse"
       ? rates.in_house_drivers
       : rates.freelance_drivers;
 
-  // normalize trip_type for lookup
-  const tripKey = booking.trip_type.replace("-", "_"); // "one-way" → "one_way"
+  const tripKey = booking.trip_type.replace("-", "_");
 
-  let amount = 0;
   switch (booking.schedule_type) {
     case "custom":
-      if (!booking.number_of_days || booking.number_of_days <= 0)
+      if (!booking.number_of_days || booking.number_of_days <= 0) {
         throw new Error("Invalid number of days for custom schedule");
-      amount = rateGroup.daily[tripKey] * booking.number_of_days;
-      break;
+      }
+
+      return rateGroup.daily[tripKey] * booking.number_of_days;
+
     case "2 weeks":
-      amount = rateGroup.bi_weekly[tripKey];
-      break;
+      return rateGroup.bi_weekly[tripKey];
+
     case "1 month":
-      amount = rateGroup.monthly[tripKey];
-      break;
+      return rateGroup.monthly[tripKey];
+
     default:
       throw new Error("Invalid schedule type");
   }
-
-  return amount;
 };
 
+/**
+ * ---------------------------
+ * START DATE VALIDATION
+ * ---------------------------
+ */
 const validateStartDate = (startDate) => {
+  if (!startDate) {
+    throw new Error("Start date is required");
+  }
+
   const now = new Date();
   const start = new Date(startDate);
 
-  if (!startDate || isNaN(start.getTime())) {
+  if (isNaN(start.getTime())) {
     throw new Error("Invalid start date");
   }
 
-  const diffInDays = (start - now) / (1000 * 60 * 60 * 24);
+  const diffDays = (start.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
 
-  if (diffInDays < -MAX_DAYS_PAST) {
+  if (diffDays < -MAX_DAYS_PAST) {
     throw new Error("Start date cannot be in the past");
   }
 
-  if (diffInDays > MAX_DAYS_AHEAD) {
+  if (diffDays > MAX_DAYS_AHEAD) {
     throw new Error("Start date is too far in the future");
   }
 };
 
+/**
+ * ---------------------------
+ * CUSTOM DAYS VALIDATION
+ * ---------------------------
+ */
 const validateCustomDays = (days) => {
   if (!Number.isInteger(days) || days < 1 || days > MAX_CUSTOM_DAYS) {
     throw new Error(`Custom days must be between 1 and ${MAX_CUSTOM_DAYS}`);
   }
 };
 
+/**
+ * ---------------------------
+ * STRIPE PRODUCT INFO
+ * ---------------------------
+ */
 const getStripeProductData = (booking, paymentType) => {
-  const childName = booking.child ? booking.child.fullname : "Unknown Child";
+  const childName = booking.child?.fullname || "Unknown Child";
 
-  const name =
-    paymentType === "renewal"
+  const isRenewal = paymentType === "renewal";
+
+  return {
+    name: isRenewal
       ? `Booking Renewal - ${booking.schedule_type} for ${childName}`
-      : `Ride Booking - ${booking.schedule_type} for ${childName}`;
+      : `Ride Booking - ${booking.schedule_type} for ${childName}`,
 
-  const descriptionParts = [];
-  if (paymentType === "renewal") descriptionParts.push(`Renewal for booking: ${childName}`);
-  else descriptionParts.push(`New booking for: ${childName}`);
+    description: [
+      isRenewal ? `Renewal for ${childName}` : `New booking for ${childName}`,
+      `Ride Type: ${booking.ride_type}`,
+      `Trip Type: ${booking.trip_type}`,
+      booking.serviceEndDate
+        ? `Expires: ${booking.serviceEndDate.toDateString()}`
+        : null,
+    ]
+      .filter(Boolean)
+      .join(" | "),
+  };
+};
 
-  descriptionParts.push(`Ride Type: ${booking.ride_type}`);
-  descriptionParts.push(`Trip Type: ${booking.trip_type}`);
+/**
+ * ---------------------------
+ * CAN START RIDE
+ * ---------------------------
+ *
+ * Only checks booking validity.
+ * Assignment state is handled elsewhere.
+ */
+const canStartRide = (booking) => {
+  if (!booking) {
+    return {
+      allowed: false,
+      message: "Booking not found",
+    };
+  }
 
-  if (booking.serviceEndDate) descriptionParts.push(`Expires: ${booking.serviceEndDate.toDateString()}`);
+  if (!booking.start_date) {
+    return {
+      allowed: false,
+      message: "Booking has no start date",
+    };
+  }
 
-  return { name, description: descriptionParts.join(" | ") };
-}
+  const now = new Date();
 
+  const startDate = new Date(booking.start_date);
+
+  if (now < startDate) {
+    return {
+      allowed: false,
+      message: "Ride has not started yet",
+    };
+  }
+
+  if (booking.serviceEndDate) {
+    const endDate = new Date(booking.serviceEndDate);
+
+    if (now > endDate) {
+      return {
+        allowed: false,
+        message: "Ride package has expired",
+      };
+    }
+  }
+
+  return {
+    allowed: true,
+  };
+};
 
 module.exports = {
   calculateBookingAmount,
   validateStartDate,
   validateCustomDays,
-  getStripeProductData
+  getStripeProductData,
+  canStartRide,
 };
