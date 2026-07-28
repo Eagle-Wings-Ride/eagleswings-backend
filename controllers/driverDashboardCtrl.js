@@ -1,7 +1,7 @@
 const Driver = require("../models/Driver");
 const Assignment = require("../models/Assignment");
-const DriverShift = require("../models/DriverShift");
-const DriverHistory = require("../models/DriverHistory");
+const DriverShift = require("../models/driverShift");
+const DriverHistory = require("../models/driverHistory");
 
 // ---------------- DASHBOARD ----------------
 
