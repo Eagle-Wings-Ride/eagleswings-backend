@@ -17,9 +17,8 @@ info:
   version: 1.0.0
 
 servers:
-  - url: http://localhost:3000/api/v1
+  - url: https://eagleswings-backend.onrender.com/api/v1
     description: Production server
-# https://eagleswings-backend.onrender.com/api/v1
 
 tags:
   - name: Admin Authentication
