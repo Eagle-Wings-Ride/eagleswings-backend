@@ -1,6 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 
+const { swaggerUi, swaggerDocument } = require("./swagger");
 const stripeWebhook = require("./utils/webhook");
 const notFoundHandler = require("./middleware/notFound");
 
@@ -16,6 +17,7 @@ const driverShiftRoutes = require("./routes/driverShift.routes");
 const driverDashboardRoutes = require("./routes/driverDashboard.routes");
 const cronRoutes = require("./routes/cron.routes");
 
+
 const app = express();
 
 /* Stripe webhook */
@@ -24,6 +26,8 @@ app.post("/webhook", express.raw({ type: "application/json" }), stripeWebhook);
 /* Global middleware */
 app.use(cors());
 app.use(express.json());
+
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 /* Routes */
 app.use("/internal/cron", cronRoutes);
