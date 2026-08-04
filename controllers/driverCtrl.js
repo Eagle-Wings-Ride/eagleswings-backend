@@ -5,6 +5,17 @@ const Admin = require("../models/Admin");
 const Assignment = require("../models/Assignment");
 const { sendToTokens } = require("../utils/pushNotifications");
 
+const getAllDrivers = async (req, res) => {
+  try {
+    const drivers = await Driver.find({}, "-password -fcmTokens");
+    res.status(200).json(drivers);
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: "Error fetching drivers", error: error.message });
+  }
+};
+
 const getDriver = async (req, res) => {
   try {
     const { id: driverId } = req.params;
@@ -208,6 +219,7 @@ const updateDriver = async (req, res) => {
 };
 
 module.exports = {
+  getAllDrivers,
   getDriver,
   updateDriver,
   viewRides,

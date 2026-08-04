@@ -34,12 +34,13 @@ const DriverSchema = new Schema({
     reasons: String,
 
     // Verification / credentials
-    car_insurance: String,
-    driver_license: String,
-    criminal_check_rec: String,
-    child_intervention_rec: String,
-    driver_abstract: String,
-    inspection_report: String,
+    car_insurance: {type: String, default: ""},
+    driver_license: {type: String, default: ""},
+    criminal_check_rec: {type: String, default: ""},
+    child_intervention_rec: {type: String, default: ""},
+    driver_abstract: {type: String, default: ""},
+    inspection_report: {type: String, default: ""},
+
 
     // Verification status
     isEmailVerified: {
@@ -70,6 +71,9 @@ const DriverSchema = new Schema({
 
     otp: String,
     otpExpiry: Date,
+    passwordResetOTP: String,
+    passwordResetExpiry: Date,
+    passwordResetVerified: { type: Boolean, default: false },
 
     // Notifications
     fcmTokens: { type: [String], default: [] },

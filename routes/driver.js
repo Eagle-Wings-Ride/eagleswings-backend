@@ -40,12 +40,12 @@ router.route('/viewRides').get(authenticateToken, viewRides)
 router.route('/upload-details/:id').patch(authenticateToken, 
                                          upload.fields([
                                           { name: "image", maxCount: 1 },
-                                          { name: "driver_license", maxCount: 2 },
-                                          { name: "car_insurance", maxCount: 2 },
-                                          { name: "criminal_check_rec", maxCount: 2 },
-                                          { name: "child_intervention_rec", maxCount: 2 },
-                                          { name: "driver_abstract", maxCount: 2 },
-                                          { name: "inspection_report", maxCount: 2 },
+                                          { name: "driver_license", maxCount: 1 },
+                                          { name: "car_insurance", maxCount: 1 },
+                                          { name: "criminal_check_rec", maxCount: 1 },
+                                          { name: "child_intervention_rec", maxCount: 1 },
+                                          { name: "driver_abstract", maxCount: 1 },
+                                          { name: "inspection_report", maxCount: 1 },
                                           ]), 
                                           uploadDriverDetails)
 
