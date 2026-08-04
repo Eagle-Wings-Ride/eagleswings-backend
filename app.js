@@ -15,6 +15,7 @@ const assignmentRoutes = require("./routes/assignments.routes");
 const driverHistoryRoutes = require("./routes/driverHistory.routes");
 const driverShiftRoutes = require("./routes/driverShift.routes");
 const driverDashboardRoutes = require("./routes/driverDashboard.routes");
+const adminDashboardRoutes = require("./routes/adminDashboard.routes");
 const cronRoutes = require("./routes/cron.routes");
 
 
@@ -39,7 +40,8 @@ app.use("/api/v1/admin", admin);
 app.use("/api/v1/assignments", assignmentRoutes);
 app.use("/api/v1/driver-history", driverHistoryRoutes);
 app.use("/api/v1/driver-shift", driverShiftRoutes);
-app.use("/api/v1/dashboard", driverDashboardRoutes);
+app.use("/api/v1/driver/dashboard", driverDashboardRoutes);
+app.use("/api/v1/admin/dashboard", adminDashboardRoutes);
 
 /* 404 */
 app.use(notFoundHandler);
