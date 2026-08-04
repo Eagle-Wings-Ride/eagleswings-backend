@@ -3,6 +3,7 @@ const router = express.Router()
 const authenticateToken = require('../middleware/authenticateToken')
 const upload = require('../cloudinary/multerConfig')
 const generateOTPAndExpiry = require('../middleware/generateOtp')
+const { changePassword, requestPasswordReset, verifyPasswordResetOTP, resendPasswordResetOTP, resetPassword } = require('../controllers/auth/driverAuthCtrl')
 
 const {registerDriver,
        loginDriver,
@@ -10,41 +11,43 @@ const {registerDriver,
        verifyDriverOTP,
        resendDriverOTP} = require('../controllers/auth/driverAuthCtrl')
 
-const {getAllDrivers,
-       getDriver,
-       updateDriver,
-       deleteDriver,
+const {updateDriver,
        uploadDriverDetails,
-       viewRides} = require('../controllers/driverCtrl')
+       viewRides, getCurrentDriver} = require('../controllers/driverCtrl')
 
 // Driver Auth Routes
-
 router.route('/register').post(generateOTPAndExpiry, registerDriver)
 router.route('/verify-mail').post(verifyDriverOTP)
 router.route('/resend-otp').post(generateOTPAndExpiry,resendDriverOTP)
 router.route('/login').post(loginDriver)
 router.route('/logout').post(authenticateToken, logoutDriver)
 
-// router.route('/forgot-password').post(authenticateToken, generateOTPAndExpiry,forgotPassword)
+//Driver Paassword Reset Routes
+router.post("/change-password", authenticateToken, changePassword);
+router.post('/password-reset/request', generateOTPAndExpiry, requestPasswordReset);
+router.post('/password-reset/resend', generateOTPAndExpiry, resendPasswordResetOTP);
+router.route("/password-reset/verify").post(verifyPasswordResetOTP);
+router
+  .route("/password-reset/reset")
+  .post(resetPassword);
+
 
 // Driver Other Routes
-router.route('/').get(authenticateToken, getAllDrivers)
+router.route('/me').get(authenticateToken, getCurrentDriver)
+                    .patch(authenticateToken, updateDriver)
 router.route('/viewRides').get(authenticateToken, viewRides)
-router.route('/:id').get(authenticateToken, getDriver)
-                     .patch(authenticateToken, updateDriver)
-                     .delete(authenticateToken, deleteDriver)
 
 router.route('/upload-details/:id').patch(authenticateToken, 
-                                          upload.fields([
-                                                 { name: "image", maxCount: 1 },
-                                                 { name: "car_insurance", maxCount: 2 },
-                                                 { name: "background_check", maxCount: 2 },
-                                                 { name: "government_issued_id", maxCount: 2 },
-                                                 { name: "criminal_check_rec", maxCount: 2 },
-                                                 { name: "child_intervention_rec", maxCount: 2 },
-                                                 { name: "driver_abstract", maxCount: 2 },
-                                                 { name: "inspection_report", maxCount: 2 }
+                                         upload.fields([
+                                          { name: "image", maxCount: 1 },
+                                          { name: "driver_license", maxCount: 2 },
+                                          { name: "car_insurance", maxCount: 2 },
+                                          { name: "criminal_check_rec", maxCount: 2 },
+                                          { name: "child_intervention_rec", maxCount: 2 },
+                                          { name: "driver_abstract", maxCount: 2 },
+                                          { name: "inspection_report", maxCount: 2 },
                                           ]), 
                                           uploadDriverDetails)
+
 
 module.exports = router
