@@ -156,9 +156,62 @@ const resendAdminOTP = async (req, res) => {
     }
 };
 
+const adminDeleteUser = async (req, res) => {
+  try {
+    if (req.user.role !== "admin") {
+      return res.status(403).json({
+        message: "Only admins can delete drivers",
+      });
+    }
+
+    const { id } = req.params;
+
+    const user = await User.findByIdAndDelete(id);
+
+    if (!user) {
+      return res.status(404).json({ message: "User Not Found" });
+    }
+
+    res.status(200).json({ message: "User deleted" });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+const adminDeleteDriver = async (req, res) => {
+  try {
+    if (req.user.role !== "admin") {
+      return res.status(403).json({
+        message: "Only admins can delete drivers",
+      });
+    }
+
+    const { id } = req.params;
+
+    const driver = await Driver.findByIdAndDelete(id);
+
+    if (!driver) {
+      return res.status(404).json({
+        message: "Driver not found",
+      });
+    }
+
+    res.status(200).json({
+      message: "Driver deleted successfully",
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: error.message,
+    });
+  }
+};
+
+
 module.exports = {
     registerAdmin,
     loginAdmin,
     verifyAdminOTP,
     resendAdminOTP,
+    adminDeleteUser,
+    adminDeleteDriver
 }

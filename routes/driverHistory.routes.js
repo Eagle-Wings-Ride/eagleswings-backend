@@ -11,6 +11,6 @@ router.use(authenticateToken);
 
 router.get("/me", getMyHistory);
 
-router.get("/:periodType/:year/:period", getHistoryByPeriod);
+router.get("/period/:periodType/:year/:period", getHistoryByPeriod);
 
 module.exports = router;

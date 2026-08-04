@@ -22,7 +22,6 @@ const {
   getUser,
   currentUser,
   updateUser,
-  deleteUser,
 } = require("../controllers/userCtrl");
 
 const {
@@ -35,12 +34,8 @@ const {
 
 // User Route
 router.route("/").get(authenticateToken, getAllUsers);
-router.route("/current").get(authenticateToken, currentUser);
-router
-  .route("/:id")
-  .get(authenticateToken, getUser)
-  .patch(authenticateToken, updateUser)
-  .delete(authenticateToken, deleteUser);
+router.route("/current").get(authenticateToken, currentUser)
+                        .patch(authenticateToken, updateUser);
 
 router.route("/register").post(generateOTPAndExpiry, registerUser);
 router.route("/login").post(loginUser);
@@ -54,8 +49,8 @@ router.post('/password-reset/request', generateOTPAndExpiry, requestPasswordRese
 router.post('/password-reset/resend', generateOTPAndExpiry, resendPasswordResetOTP);
 router.route("/password-reset/verify").post(verifyPasswordResetOTP);
 router
-  .route("/password-reset/forgot-password")
-  .post(generateOTPAndExpiry, forgotPassword);
+  .route("/password-reset/reset")
+  .post(forgotPassword);
 
 // Children Routes
 router

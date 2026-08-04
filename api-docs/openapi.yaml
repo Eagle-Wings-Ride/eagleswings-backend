@@ -1,0 +1,5986 @@
+openapi: 3.0.3
+
+info:
+  title: Eagles Wings Ride API
+  description: |
+    API documentation for Eagles Wings Ride platform.
+
+    Includes:
+    - Admin portal
+    - Driver authentication
+    - Driver management
+    - Ride lifecycle
+    - Driver dashboard
+    - Driver history
+    - Driver shifts
+
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:3000/api/v1
+    description: Production server
+# https://eagleswings-backend.onrender.com/api/v1
+
+tags:
+  - name: Admin Authentication
+    description: |
+      Endpoints for administrator account registration, email verification,
+      login, and OTP management.
+
+  - name: User Authentication
+    description: |
+      User registration, login, email verification,
+      OTP management, and password recovery.
+
+  - name: Driver Authentication
+    description: |
+      Driver registration, login, email verification,
+      OTP management, and password recovery.
+
+  - name: User Profile
+    description: |
+      Manage authenticated user information.
+
+  - name: Children Management
+    description: |
+      Add and manage children associated with a user account.
+
+  - name: Ride Booking
+    description: |
+      Create, update, and view ride bookings.
+
+  - name: Payments
+    description: |
+      Handle Stripe checkout and booking renewals.
+
+  - name: Driver Profile
+    description: |
+      Manage authenticated driver information.
+
+  - name: Driver Documents
+    description: |
+      Upload and manage driver verification documents.
+
+  - name: Assignments
+    description: |
+      Manage driver assignments for bookings, including assigning,
+      accepting, rejecting, tracking, and completing rides.
+
+  - name: Driver Shift
+    description: |
+      View and manage the authenticated driver's current work shift.
+
+  - name: Driver History
+    description: |
+      View driving history, completed shifts, ride statistics,
+      and performance metrics for the authenticated driver.
+
+  - name: Admin Account Management
+    description: |
+      Manage user and driver accounts.
+      View, update, and delete accounts as an administrator.
+
+  - name: Admin Dashboard
+    description: |
+      Dashboard analytics and statistics available to authenticated administrators.
+
+  - name: Driver Management
+    description: |
+      Approve drivers, assign rides, and unassign drivers from bookings.
+
+
+components:
+
+  securitySchemes:
+
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+
+    ErrorResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Invalid credentials
+
+    SuccessResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Operation completed successfully
+
+
+    Admin:
+      type: object
+
+      properties:
+
+        _id:
+          type: string
+          example: 68bfcb8fd2f97b3ac30ba278
+
+        fullname:
+          type: string
+          example: John Doe
+
+        email:
+          type: string
+          format: email
+          example: admin@example.com
+
+        isVerified:
+          type: boolean
+          example: true
+
+        status:
+          type: string
+          enum:
+            - active
+            - suspended
+
+        role:
+          type: string
+          enum:
+            - admin
+            - superadmin
+
+        createdAt:
+          type: string
+          format: date-time
+    
+    AdminRegisterRequest:
+
+      type: object
+
+      required:
+        - fullname
+        - email
+        - password
+
+      properties:
+
+        fullname:
+          type: string
+          minLength: 3
+          maxLength: 50
+          example: John Admin
+
+        email:
+          type: string
+          format: email
+          example: admin@example.com
+
+        password:
+          type: string
+          minLength: 6
+          example: Eagles123
+    
+    AdminLoginRequest:
+
+      type: object
+
+      required:
+        - email
+        - password
+
+      properties:
+
+        email:
+          type: string
+          format: email
+          example: admin@example.com
+
+        password:
+          type: string
+          example: Eagles123
+    
+    
+    AdminVerifyOtpRequest:
+
+      type: object
+
+      required:
+        - email
+        - otp
+
+      properties:
+
+        email:
+          type: string
+          format: email
+          example: admin@example.com
+
+        otp:
+          type: string
+          example: "174584"
+
+
+    AdminResendOtpRequest:
+
+      type: object
+
+      required:
+        - email
+
+      properties:
+
+        email:
+          type: string
+          format: email
+          example: admin@example.com
+
+
+    Driver:
+      type: object
+
+      properties:
+
+        _id:
+          type: string
+
+        fullname:
+          type: string
+
+        email:
+          type: string
+
+        phone_number:
+          type: string
+
+        age:
+          type: string
+
+        image:
+          type: string
+
+        residential_address:
+          type: string
+
+        preferred_route:
+          type: string
+
+        reasons:
+          type: string
+          example: Experienced school transportation driver
+
+
+        car_insurance:
+          type: string
+          example: https://storage.example.com/car-insurance.pdf
+
+
+        driver_license:
+          type: string
+          example: https://storage.example.com/license.pdf
+
+
+        criminal_check_rec:
+          type: string
+          example: https://storage.example.com/criminal-check.pdf
+
+
+        child_intervention_rec:
+          type: string
+          example: https://storage.example.com/intervention-record.pdf
+
+
+        driver_abstract:
+          type: string
+          example: https://storage.example.com/driver-abstract.pdf
+
+
+        inspection_report:
+          type: string
+          example: https://storage.example.com/inspection-report.pdf
+
+
+        isEmailVerified:
+          type: boolean
+
+
+        isDriverApproved:
+          type: boolean
+
+
+        status:
+          type: string
+          enum:
+            - driving
+            - unavailable
+            - online
+            - offline
+
+        current_latitude:
+          type: number
+
+        current_longitude:
+          type: number
+
+
+        start_latitude:
+          type: number
+
+        start_longitude:
+          type: number
+
+        end_latitude:
+          type: number
+
+        end_longitude:
+          type: number
+
+
+        createdAt:
+          type: string
+          format: date-time
+
+
+        updatedAt:
+          type: string
+          format: date-time
+
+
+    UpdateDriverRequest:
+      type: object
+      properties:
+
+        fullname:
+          type: string
+
+        phone_number:
+          type: string
+
+        age:
+          type: string
+
+        residential_address:
+          type: string
+
+        preferred_route:
+          type: string
+
+        reasons:
+          type: string
+
+
+    DriverUploadDetailsRequest:
+      type: object
+
+      properties:
+
+        image:
+          type: string
+          format: binary
+
+        driver_license:
+          type: array
+          items:
+            type: string
+            format: binary
+
+        car_insurance:
+          type: array
+          items:
+            type: string
+            format: binary
+
+        criminal_check_rec:
+          type: array
+          items:
+            type: string
+            format: binary
+
+        child_intervention_rec:
+          type: array
+          items:
+            type: string
+            format: binary
+
+        driver_abstract:
+          type: array
+          items:
+            type: string
+            format: binary
+
+        inspection_report:
+          type: array
+          items:
+            type: string
+            format: binary
+
+    DriverRegisterRequest:
+      type: object
+
+      required:
+        - fullname
+        - email
+        - password
+
+      properties:
+
+        fullname:
+          type: string
+
+        email:
+          format: email
+
+        password:
+          type: string
+          format: password
+
+        phone_number:
+          type: string
+
+        residential_address:
+          type: string
+
+
+    Assignment:
+
+      type: object
+
+      properties:
+
+        _id:
+          type: string
+
+        booking:
+          type: string
+
+        driver:
+          type: string
+
+        assignedBy:
+          type: string
+
+        shift:
+          type: string
+          enum:
+            - morning
+            - afternoon
+
+        status:
+          type: string
+          enum:
+            - pending
+            - accepted
+            - rejected
+            - enroute_pickup
+            - arrived_pickup
+            - picked_up
+            - enroute_dropoff
+            - arrived_dropoff
+            - completed
+            - cancelled
+            - expired
+        
+        startedAt:
+          type: string
+          format: date-time
+
+        arrivedPickupAt:
+          type: string
+          format: date-time
+
+        pickupTime:
+          type: string
+          format: date-time
+
+        arrivedDropoffAt:
+          type: string
+          format: date-time
+
+        shiftRecord:
+          type: string
+
+        lastLocation:
+          type: object
+          properties:
+            lat:
+              type: number
+            lng:
+              type: number
+            timestamp:
+              type: string
+              format: date-time
+
+        pickupDistanceMeters:
+          type: number
+
+        tripDistanceMeters:
+          type: number
+
+        durationMinutes:
+          type: number
+
+        acceptedAt:
+          type: string
+          format: date-time
+
+        completedAt:
+          type: string
+          format: date-time
+
+        cancelledAt:
+          type: string
+          format: date-time
+
+        createdAt:
+          type: string
+          format: date-time
+
+        updatedAt:
+          type: string
+          format: date-time
+
+
+    DriverShift:
+
+      type: object
+
+      properties:
+
+        _id:
+          type: string
+
+        driver:
+          type: string
+
+        date:
+          type: string
+          format: date
+
+        shift:
+          type: string
+          enum:
+            - morning
+            - afternoon
+
+        status:
+          type: string
+          enum:
+            - active
+            - completed
+            - cancelled
+
+        startedAt:
+          type: string
+          format: date-time
+
+        endedAt:
+          type: string
+          format: date-time
+
+        completedAt:
+          type: string
+          format: date-time
+
+        totalMinutes:
+          type: number
+
+        totalHours:
+          type: number
+
+        totalDistanceMeters:
+          type: number
+
+        assignmentCount:
+          type: integer
+
+        historyUpdated:
+          type: boolean
+
+        assignments:
+          type: array
+          items:
+            type: string
+
+        createdAt:
+          type: string
+          format: date-time
+
+        updatedAt:
+          type: string
+          format: date-time
+
+        
+    Booking:
+      type: object
+
+      properties:
+
+        _id:
+          type: string
+          example: 68bfcb8fd2f97b3ac30ba278
+
+        ride_type:
+          type: string
+          enum:
+            - freelance
+            - inhouse
+
+        trip_type:
+          type: string
+          enum:
+            - one-way
+            - return
+
+        schedule_type:
+          type: string
+          enum:
+            - 2 weeks
+            - 1 month
+
+        pickup_days:
+          type: array
+          items:
+            type: string
+            enum:
+              - sunday
+              - monday
+              - tuesday
+              - wednesday
+              - thursday
+              - friday
+              - saturday
+
+        start_date:
+          type: string
+          format: date
+
+        morning_from:
+          type: string
+          enum:
+            - home
+            - school
+            - daycare
+
+        morning_to:
+          type: string
+          enum:
+            - home
+            - school
+            - daycare
+
+        morning_time:
+          type: string
+          example: "07:30"
+
+        morning_from_address:
+          type: string
+
+        morning_to_address:
+          type: string
+
+        afternoon_from:
+          type: string
+          enum:
+            - home
+            - school
+            - daycare
+
+        afternoon_to:
+          type: string
+          enum:
+            - home
+            - school
+            - daycare
+
+        afternoon_time:
+          type: string
+          example: "15:15"
+
+        afternoon_from_address:
+          type: string
+
+        afternoon_to_address:
+          type: string
+
+        start_latitude:
+          type: number
+
+        start_longitude:
+          type: number
+
+        end_latitude:
+          type: number
+
+        end_longitude:
+          type: number
+
+        status:
+          type: string
+          enum:
+            - booked
+            - ongoing
+            - paid
+            - assigned
+            - payment_failed
+            - completed
+            - cancelled
+            - expired
+
+        cancellationReason:
+          type: string
+
+        cancellationDate:
+          type: string
+          format: date-time
+
+        serviceStartDate:
+          type: string
+          format: date
+
+        serviceEndDate:
+          type: string
+          format: date
+
+        reminderSent:
+          type: boolean
+
+        user:
+          type: string
+          example: 68bfcb8fd2f97b3ac30ba278
+
+        child:
+          type: string
+          example: 68bfcb8fd2f97b3ac30ba279
+
+        createdAt:
+          type: string
+          format: date-time
+
+        updatedAt:
+          type: string
+          format: date-time
+
+
+    DriverHistory:
+      type: object
+
+      properties:
+
+        _id:
+          type: string
+
+        driver:
+          type: string
+          description: Driver ID
+
+        periodType:
+          type: string
+          enum:
+            - day
+            - week
+            - month
+            - year
+
+        period:
+          type: integer
+          description: Day, week number, or month depending on periodType
+
+        year:
+          type: integer
+
+        ridesAccepted:
+          type: integer
+
+        ridesRejected:
+          type: integer
+
+        ridesCompleted:
+          type: integer
+
+        totalHours:
+          type: number
+
+        totalActiveMinutes:
+          type: number
+
+        totalShifts:
+          type: integer
+
+        shiftsCompleted:
+          type: integer
+
+        totalDistanceKm:
+          type: number
+
+        averageDistanceKm:
+          type: number
+
+        averageRideMinutes:
+          type: number
+
+        paidAmount:
+          type: number
+
+        grossPay:
+          type: number
+
+        netPay:
+          type: number
+
+        acceptanceRate:
+          type: number
+
+        completionRate:
+          type: number
+
+        lastRideCompletedAt:
+          type: string
+          format: date-time
+
+        lastShiftCompletedAt:
+          type: string
+          format: date-time
+
+        lastUpdatedFromShift:
+          type: string
+
+        createdAt:
+          type: string
+          format: date-time
+
+        updatedAt:
+          type: string
+          format: date-time
+
+
+    CreateBookingRequest:
+      type: object
+
+      required:
+        - ride_type
+        - trip_type
+        - schedule_type
+        - pickup_days
+        - start_date
+        - start_latitude
+        - start_longitude
+        - end_latitude
+        - end_longitude
+
+      properties:
+
+        ride_type:
+          type: string
+          enum:
+            - freelance
+            - inhouse
+
+        trip_type:
+          type: string
+          enum:
+            - one-way
+            - return
+
+        schedule_type:
+          type: string
+          enum:
+            - 2 weeks
+            - 1 month
+
+        pickup_days:
+          type: array
+          items:
+            type: string
+            enum:
+              - sunday
+              - monday
+              - tuesday
+              - wednesday
+              - thursday
+              - friday
+              - saturday
+
+        start_date:
+          type: string
+          format: date
+
+        morning_from:
+          type: string
+          enum:
+            - home
+            - school
+            - daycare
+
+        morning_to:
+          type: string
+          enum:
+            - home
+            - school
+            - daycare
+
+        morning_time:
+          type: string
+          example: "07:30"
+
+        afternoon_from:
+          type: string
+          enum:
+            - home
+            - school
+            - daycare
+
+        afternoon_to:
+          type: string
+          enum:
+            - home
+            - school
+            - daycare
+
+        afternoon_time:
+          type: string
+          example: "15:30"
+
+        start_latitude:
+          type: number
+
+        start_longitude:
+          type: number
+
+        end_latitude:
+          type: number
+
+        end_longitude:
+          type: number
+
+    UpdateBookingRequest:
+      type: object
+
+      properties:
+        ride_type:
+          type: string
+          enum:
+            - freelance
+            - inhouse
+
+        trip_type:
+          type: string
+          enum:
+            - one-way
+            - return
+
+        schedule_type:
+          type: string
+          enum:
+            - custom
+            - 2 weeks
+            - 1 month
+
+        number_of_days:
+          type: integer
+
+        pickup_days:
+          type: array
+          items:
+            type: string
+
+        start_date:
+          type: string
+          format: date
+
+        morning_from:
+          type: string
+
+        morning_to:
+          type: string
+
+        morning_time:
+          type: string
+
+        afternoon_from:
+          type: string
+
+        afternoon_to:
+          type: string
+
+        afternoon_time:
+          type: string
+
+        start_latitude:
+          type: number
+
+        start_longitude:
+          type: number
+
+        end_latitude:
+          type: number
+
+        end_longitude:
+          type: number
+
+
+    AdminDashboard:
+
+      type: object
+
+      properties:
+
+        drivers:
+
+          type: object
+
+          properties:
+
+            total:
+              type: integer
+
+            online:
+              type: integer
+
+            offline:
+              type: integer
+
+            activeShifts:
+              type: integer
+
+        rides:
+
+          type: object
+
+          properties:
+
+            active:
+              type: integer
+
+            pending:
+              type: integer
+
+            completedToday:
+              type: integer
+
+            cancelledToday:
+              type: integer
+
+        bookings:
+
+          type: object
+
+          properties:
+
+            paid:
+              type: integer
+
+            pendingPayment:
+              type: integer
+
+            expired:
+              type: integer
+
+            expiringSoon:
+              type: integer
+
+        users:
+
+          type: object
+
+          properties:
+
+            parents:
+              type: integer
+
+            children:
+              type: integer
+
+    AdminUserDashboard:
+
+      type: object
+
+      properties:
+
+        stats:
+
+          type: object
+
+          properties:
+
+            totalUsers:
+              type: integer
+              example: 150
+
+            verifiedUsers:
+              type: integer
+              example: 120
+
+            unverifiedUsers:
+              type: integer
+              example: 30
+
+            totalChildren:
+              type: integer
+              example: 220
+
+            usersWithoutBookings:
+              type: integer
+              example: 45
+
+
+        recentUsers:
+
+          type: array
+
+          items:
+
+            type: object
+
+            properties:
+
+              fullname:
+                type: string
+                example: "John Smith"
+
+              email:
+                type: string
+                example: "john@email.com"
+
+              phone_number:
+                type: string
+                example: "+123456789"
+
+              isVerified:
+                type: boolean
+                example: true
+
+              createdAt:
+                type: string
+                format: date-time
+
+
+        usersWithChildren:
+
+          type: array
+
+          items:
+
+            type: object
+
+            properties:
+
+              fullname:
+                type: string
+
+              email:
+                type: string
+
+              childrenCount:
+                type: integer
+
+
+        recentBookings:
+
+          type: array
+
+          items:
+
+            type: object
+
+
+    AdminDriverDashboard:
+
+      type: object
+
+      properties:
+
+        stats:
+
+          type: object
+
+          properties:
+
+            totalDrivers:
+              type: integer
+
+            approvedDrivers:
+              type: integer
+
+            pendingDrivers:
+              type: integer
+
+            onlineDrivers:
+              type: integer
+
+            drivingDrivers:
+              type: integer
+
+
+        recentDrivers:
+
+          type: array
+
+          items:
+
+            type: object
+
+
+        activeShifts:
+
+          type: array
+
+          items:
+
+            type: object
+
+
+        activeRides:
+
+          type: array
+
+          items:
+
+            type: object
+
+    AdminBookingDashboard:
+
+      type: object
+
+      properties:
+
+        stats:
+
+          type: object
+
+          properties:
+
+            totalBookings:
+              type: integer
+
+            paidBookings:
+              type: integer
+
+            assignedBookings:
+              type: integer
+
+            cancelledBookings:
+              type: integer
+
+            expiredBookings:
+              type: integer
+
+            pendingPayment:
+              type: integer
+
+
+        unassignedBookings:
+
+          type: array
+
+          items:
+
+            type: object
+
+
+        recentBookings:
+
+          type: array
+
+          items:
+
+            type: object
+
+
+        activeBookings:
+
+          type: array
+
+          items:
+
+            type: object
+
+
+        upcomingAssignments:
+
+          type: array
+
+          items:
+
+            type: object
+
+    AdminRideDashboard:
+
+      type: object
+
+      properties:
+
+        stats:
+
+          type: object
+
+          properties:
+
+            ridesToday:
+              type: integer
+
+            completedRides:
+              type: integer
+
+            activeRides:
+              type: integer
+
+            cancelledRides:
+              type: integer
+
+            pendingRides:
+              type: integer
+
+
+        currentRides:
+
+          type: array
+
+          items:
+
+            type: object
+
+
+        recentCompleted:
+
+          type: array
+
+          items:
+
+            type: object
+
+
+        activeDrivers:
+
+          type: array
+
+          items:
+
+            type: object
+
+
+        waitingAssignments:
+
+          type: array
+
+          items:
+
+            type: object
+
+
+    User:
+      type: object
+      properties:
+
+        _id:
+          type: string
+          example: 68bfcb8fd2f97b3ac30ba278
+
+        fullname:
+          type: string
+          example: Tim Park
+
+        email:
+          type: string
+          format: email
+          example: timpark1@gmail.com
+
+        phone_number:
+          type: string
+          example: "+17805551234"
+
+        address:
+          type: string
+          example: Fort McMurray, Alberta
+
+        location:
+          type: string
+          example: Fort McMurray
+
+        isVerified:
+          type: boolean
+          example: true
+
+        createdAt:
+          type: string
+          format: date-time
+
+        updatedAt:
+          type: string
+          format: date-time
+
+
+    RegisterUserRequest:
+      type: object
+
+      required:
+        - fullname
+        - email
+        - password
+
+      properties:
+
+        fullname:
+          type: string
+          example: Tim Park
+
+        email:
+          type: string
+          format: email
+          example: timpark1@gmail.com
+
+        password:
+          type: string
+          example: Eagles123
+
+        phone_number:
+          type: string
+          example: "+17805551234"
+
+        address:
+          type: string
+          example: Fort McMurray, Alberta
+
+    UpdateUserRequest:
+
+      type: object
+
+      properties:
+
+        fullname:
+          type: string
+          example: Tim Parker
+
+        phone_number:
+          type: string
+          example: "+17805559999"
+
+        address:
+          type: string
+          example: Fort McMurray, Alberta
+
+        location:
+          type: string
+          example: Fort McMurray
+
+
+    LoginRequest:
+      type: object
+
+      required:
+        - email
+        - password
+
+      properties:
+
+        email:
+          type: string
+          format: email
+          example: timpark1@gmail.com
+
+        password:
+          type: string
+          example: Eagles123
+
+
+    LoginResponse:
+      type: object
+
+      properties:
+
+        message:
+          type: string
+          example: Login successful
+
+        token:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIsInR...
+
+
+    OTPRequest:
+      type: object
+
+      required:
+        - email
+        - otp
+
+      properties:
+
+        email:
+          type: string
+          format: email
+          example: timpark1@gmail.com
+
+        otp:
+          type: string
+          example: "123456"
+
+
+    PasswordResetRequest:
+      type: object
+
+      required:
+        - email
+
+      properties:
+
+        email:
+          type: string
+          format: email
+          example: timpark1@gmail.com
+
+
+    PasswordResetConfirmRequest:
+      type: object
+
+      required:
+        - email
+        - newPassword
+        - confirmPassword
+
+      properties:
+
+        email:
+          type: string
+          format: email
+          example: timpark1@gmail.com
+
+        newPassword:
+          type: string
+          example: NewPassword123
+
+        confirmPassword:
+          type: string
+          example: NewPassword123
+
+    Child:
+      type: object
+      properties:
+        _id:
+          type: string
+
+        fullname:
+          type: string
+          example: Emma Park
+
+        image:
+          type: string
+          example: https://cloudinary.com/image.jpg
+
+        age:
+          type: integer
+          example: 8
+
+        grade:
+          type: string
+          example: Grade 3
+
+        relationship:
+          type: string
+          example: Daughter
+
+        school:
+          type: string
+          example: Fort McMurray Elementary
+
+        home_address:
+          type: string
+
+        school_address:
+          type: string
+
+        daycare_address:
+          type: string
+
+        user:
+          type: string
+          example: 68bfcb8fd2f97b3ac30ba278
+
+
+    CreateChildRequest:
+
+      type: object
+
+      required:
+
+        - fullname
+        - age
+        - relationship
+
+      properties:
+
+        fullname:
+
+          type: string
+
+          example: Emma Park
+
+
+        image:
+
+          type: string
+
+          example: https://cloudinary.com/image.jpg
+
+
+        age:
+
+          type: integer
+
+          example: 8
+
+
+        grade:
+
+          type: string
+
+          example: Grade 3
+
+
+        relationship:
+
+          type: string
+
+          example: Daughter
+
+
+        school:
+
+          type: string
+
+          example: Fort McMurray Elementary
+
+
+        home_address:
+
+          type: string
+
+
+        school_address:
+
+          type: string
+
+
+        daycare_address:
+
+          type: string
+
+
+    UpdateChildRequest:
+
+      type: object
+
+      properties:
+
+        fullname:
+
+          type: string
+
+        image:
+
+          type: string
+
+        age:
+
+          type: integer
+
+        grade:
+
+          type: string
+
+        relationship:
+
+          type: string
+
+        school:
+
+          type: string
+
+        home_address:
+
+          type: string
+
+        school_address:
+
+          type: string
+
+        daycare_address:
+
+          type: string
+
+
+    RegisterRequest:
+      type: object
+      required:
+        - fullname
+        - email
+        - password
+      properties:
+        fullname:
+          type: string
+
+        email:
+          type: string
+          format: email
+
+        password:
+          type: string
+
+        phone_number:
+          type: string
+
+        address:
+          type: string
+
+    PaymentRequest:
+      type: object
+
+      required:
+        - bookingId
+        - currency
+
+      properties:
+
+        bookingId:
+          type: string
+          example: 68bfcb8fd2f97b3ac30ba278
+
+        currency:
+          type: string
+          enum:
+            - cad
+
+
+paths:
+  /admin/register:
+
+    post:
+
+      tags:
+        - Admin Authentication
+
+      summary: Register Admin Account
+
+      description: |
+        Creates a new administrator account.
+        
+        After successful registration, an OTP is generated and sent
+        to the provided email address for verification.
+
+      requestBody:
+
+        required: true
+
+        content:
+
+          application/json:
+
+            schema:
+
+              $ref: '#/components/schemas/AdminRegisterRequest'
+
+
+      responses:
+
+        '201':
+
+          description: Admin registered successfully
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/SuccessResponse'
+
+
+        '400':
+
+          description: Missing required fields
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/ErrorResponse'
+
+
+        '409':
+
+          description: Email already exists
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/ErrorResponse'
+
+
+        '500':
+
+          description: Registration failed
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/ErrorResponse'
+  
+  
+  /admin/login:
+
+    post:
+
+      tags:
+        - Admin Authentication
+
+      summary: Login Admin
+
+      description: |
+        Authenticates an administrator and returns a JWT token.
+
+      requestBody:
+
+        required: true
+
+        content:
+
+          application/json:
+
+            schema:
+
+              $ref: '#/components/schemas/AdminLoginRequest'
+
+
+      responses:
+
+        '200':
+
+          description: Login successful
+
+          content:
+
+            application/json:
+
+              schema:
+
+                type: object
+
+                properties:
+
+                  message:
+
+                    type: string
+
+                    example: Login successful
+
+                  token:
+
+                    type: string
+
+                    example: eyJhbGciOiJIUzI1NiIs...
+
+
+        '400':
+
+          description: Missing email or password
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/ErrorResponse'
+
+
+        '401':
+
+          description: Invalid credentials or email not verified
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/ErrorResponse'
+
+
+        '500':
+
+          description: Internal server error
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /admin/verify-mail:
+
+    post:
+
+      tags:
+
+        - Admin Authentication
+
+
+      summary: Verify Admin Email Using OTP
+
+
+      description: |
+        Verifies the administrator email address using the OTP
+        sent during registration.
+
+
+      requestBody:
+
+        required: true
+
+        content:
+
+          application/json:
+
+            schema:
+
+              $ref: '#/components/schemas/AdminVerifyOtpRequest'
+
+
+      responses:
+
+        '200':
+
+          description: OTP verified successfully
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/SuccessResponse'
+
+
+        '400':
+
+          description: Invalid email or expired OTP
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/ErrorResponse'
+
+
+        '500':
+
+          description: OTP verification failed
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /admin/resend-otp:
+
+    post:
+
+      tags:
+
+        - Admin Authentication
+
+
+      summary: Resend Admin OTP
+
+
+      description: |
+        Generates and sends a new OTP to an unverified administrator account.
+
+      requestBody:
+
+        required: true
+
+        content:
+
+          application/json:
+
+            schema:
+
+              $ref: '#/components/schemas/AdminResendOtpRequest'
+
+
+      responses:
+
+        '200':
+
+          description: OTP resent successfully
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/SuccessResponse'
+
+
+        '400':
+
+          description: Admin already verified
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/ErrorResponse'
+
+
+        '404':
+
+          description: Admin not found
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/ErrorResponse'
+
+
+        '500':
+
+          description: Failed to resend OTP
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/ErrorResponse'
+
+
+  /admin/dashboard/:
+
+    get:
+
+      tags:
+
+        - Admin Dashboard
+
+
+      summary: Get Admin Dashboard Statistics
+
+
+      description: |
+        Returns platform statistics available to authenticated administrators.
+
+        Includes:
+        - Driver statistics
+        - Ride activity
+        - Booking statistics
+        - User statistics
+
+
+      security:
+
+        - bearerAuth: []
+
+
+      responses:
+
+
+        '200':
+
+          description: Dashboard statistics retrieved successfully
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/AdminDashboard'
+
+
+
+        '401':
+
+          description: Unauthorized - Missing or invalid authentication token
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/ErrorResponse'
+
+        '500':
+
+          description: Failed to retrieve dashboard data
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/ErrorResponse'
+
+
+  /admin/dashboard/users:
+
+    get:
+
+      tags:
+
+        - Admin Dashboard
+
+      summary: Get Admin Users Dashboard
+
+      description: |
+        Returns user-related statistics and information available to administrators.
+
+        Includes:
+        - Total users
+        - Verified and unverified users
+        - Total children
+        - Users without bookings
+        - Recent users
+        - Users with children statistics
+        - Recent bookings by users
+
+      security:
+
+        - bearerAuth: []
+
+      responses:
+
+        '200':
+
+          description: User dashboard data retrieved successfully
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/AdminUserDashboard'
+
+
+        '401':
+
+          description: Unauthorized - Missing or invalid authentication token
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/ErrorResponse'
+
+
+        '500':
+
+          description: Failed to retrieve user dashboard data
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/ErrorResponse'
+
+
+  /admin/dashboard/drivers:
+
+    get:
+
+      tags:
+
+        - Admin Dashboard
+
+      summary: Get Admin Drivers Dashboard
+
+      description: |
+        Returns driver-related statistics and operational information.
+
+        Includes:
+        - Total drivers
+        - Approved drivers
+        - Pending drivers
+        - Online drivers
+        - Active shifts
+        - Current active rides
+        - Recently registered drivers
+
+      security:
+
+        - bearerAuth: []
+
+      responses:
+
+        '200':
+
+          description: Driver dashboard data retrieved successfully
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/AdminDriverDashboard'
+
+
+        '401':
+
+          description: Unauthorized - Missing or invalid authentication token
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/ErrorResponse'
+
+
+        '500':
+
+          description: Failed to retrieve driver dashboard data
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/ErrorResponse'
+
+
+  /admin/dashboard/bookings:
+
+    get:
+
+      tags:
+
+        - Admin Dashboard
+
+      summary: Get Admin Bookings Dashboard
+
+      description: |
+        Returns booking statistics and booking management information.
+
+        Includes:
+        - Total bookings
+        - Paid bookings
+        - Assigned bookings
+        - Cancelled bookings
+        - Expired bookings
+        - Pending payments
+        - Unassigned bookings
+        - Active bookings
+        - Upcoming assignments
+
+      security:
+
+        - bearerAuth: []
+
+      responses:
+
+        '200':
+
+          description: Booking dashboard data retrieved successfully
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/AdminBookingDashboard'
+
+
+        '401':
+
+          description: Unauthorized - Missing or invalid authentication token
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/ErrorResponse'
+
+
+        '500':
+
+          description: Failed to retrieve booking dashboard data
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/ErrorResponse'
+
+
+  /admin/dashboard/rides:
+
+    get:
+
+      tags:
+
+        - Admin Dashboard
+
+      summary: Get Admin Rides Dashboard
+
+      description: |
+        Returns ride operations statistics and live ride information.
+
+        Includes:
+        - Rides today
+        - Completed rides
+        - Active rides
+        - Cancelled rides
+        - Pending rides
+        - Current rides with drivers
+        - Recently completed rides
+        - Active drivers
+        - Waiting assignments
+
+      security:
+
+        - bearerAuth: []
+
+      responses:
+
+        '200':
+
+          description: Ride dashboard data retrieved successfully
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/AdminRideDashboard'
+
+
+        '401':
+
+          description: Unauthorized - Missing or invalid authentication token
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/ErrorResponse'
+
+
+        '500':
+
+          description: Failed to retrieve ride dashboard data
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/ErrorResponse'
+
+
+  /admin/approve-driver/{id}:
+
+    patch:
+
+      tags:
+
+        - Driver Management
+
+
+      summary: Approve or Disapprove Driver
+
+
+      description: |
+        Allows an authenticated administrator to approve or disapprove a driver application.
+
+        The driver approval status is updated using the is_approved field.
+
+
+      security:
+
+        - bearerAuth: []
+
+
+      parameters:
+
+        - name: id
+
+          in: path
+
+          required: true
+
+          description: Driver ID
+
+          schema:
+
+            type: string
+
+            example: 67ec7667a21bbffa6f499cf4
+
+
+      requestBody:
+
+        required: true
+
+        content:
+
+          application/json:
+
+            schema:
+
+              type: object
+
+              required:
+
+                - is_approved
+
+              properties:
+
+                is_approved:
+
+                  type: boolean
+
+                  example: true
+
+
+
+      responses:
+
+
+        '200':
+
+          description: Driver approval status updated successfully
+
+          content:
+
+            application/json:
+
+              schema:
+
+                type: object
+
+                properties:
+
+                  message:
+
+                    type: string
+
+                    example: Driver has been approved!
+
+                  driver:
+
+                    $ref: '#/components/schemas/Driver'
+
+
+
+        '400':
+
+          description: Invalid approval value
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/ErrorResponse'
+
+
+
+        '401':
+
+          description: Unauthorized
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/ErrorResponse'
+
+
+
+        '403':
+
+          description: Forbidden - User is not an admin
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/ErrorResponse'
+
+
+
+        '404':
+
+          description: Driver or admin not found
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/ErrorResponse'
+
+
+
+        '500':
+
+          description: Server error
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/ErrorResponse'
+  
+
+  /admin/bookings/{bookingId}/assign-driver:
+
+    patch:
+
+      tags:
+
+        - Driver Management
+
+
+      summary: Assign Driver To Booking
+
+
+      description: |
+        Assigns an approved driver to a booking.
+        
+        Creates a pending assignment that requires driver acceptance.
+
+
+      security:
+
+        - bearerAuth: []
+
+
+      parameters:
+
+        - name: bookingId
+
+          in: path
+
+          required: true
+
+          description: Booking ID
+
+          schema:
+
+            type: string
+
+            example: 68bfd244d2f97b3ac30ba293
+
+
+
+      requestBody:
+
+        required: true
+
+        content:
+
+          application/json:
+
+            schema:
+
+              type: object
+
+              required:
+
+                - driverId
+
+
+              properties:
+
+                driverId:
+
+                  type: string
+
+                  example: 6907ece095bc7e2a3d62be46
+
+
+                shift:
+
+                  type: string
+
+                  enum:
+
+                    - morning
+                    - afternoon
+
+                  example: morning
+
+
+
+      responses:
+
+
+        '200':
+
+          description: Driver assignment created
+
+          content:
+
+            application/json:
+
+              schema:
+
+                type: object
+
+                properties:
+
+                  message:
+
+                    type: string
+
+                    example: Driver assignment created (pending driver response)
+
+
+                  assignment:
+
+                    $ref: '#/components/schemas/Assignment'
+
+
+        '400':
+
+          description: Invalid booking, driver, or shift
+
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/ErrorResponse'
+
+
+        '401':
+
+          description: Unauthorized
+
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/ErrorResponse'
+
+
+        '404':
+
+          description: Booking or driver not found
+
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/ErrorResponse'
+
+
+        '500':
+
+          description: Server error
+
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/ErrorResponse'
+
+
+  /admin/bookings/{bookingId}/unassign-driver:
+
+    patch:
+
+      tags:
+
+        - Driver Management
+
+
+      summary: Unassign Driver From Booking
+
+
+      description: |
+        Removes an assigned driver from a booking.
+
+
+      security:
+
+        - bearerAuth: []
+
+
+      parameters:
+
+        - name: bookingId
+
+          in: path
+
+          required: true
+
+          description: Booking ID
+
+          schema:
+
+            type: string
+
+            example: 68bfd244d2f97b3ac30ba293
+
+
+
+      requestBody:
+
+        required: true
+
+        content:
+
+          application/json:
+
+            schema:
+
+              type: object
+
+              required:
+
+                - driverId
+
+
+              properties:
+
+                driverId:
+
+                  type: string
+
+                  example: 6907ece095bc7e2a3d62be46
+
+
+
+      responses:
+
+
+        '200':
+
+          description: Driver removed successfully
+
+
+          content:
+
+            application/json:
+
+              schema:
+
+                type: object
+
+                properties:
+
+                  message:
+
+                    type: string
+
+                    example: Driver unassigned successfully
+
+
+                  removedAssignment:
+
+                    $ref: '#/components/schemas/Assignment'
+
+
+        '401':
+
+          description: Unauthorized
+
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/ErrorResponse'
+
+
+        '404':
+
+          description: Assignment not found
+
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/ErrorResponse'
+
+
+        '500':
+
+          description: Server error
+
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/ErrorResponse'
+
+
+  /admin/history/{driverId}:
+
+    get:
+
+      tags:
+
+        - Driver History
+
+
+      summary: Get Driver History
+
+
+      description: |
+        Returns ride and earnings history records for a specific driver.
+
+        Accessible only by authenticated administrators.
+
+
+      security:
+
+        - bearerAuth: []
+
+
+      parameters:
+
+        - name: driverId
+
+          in: path
+
+          required: true
+
+          description: Driver ID
+
+          schema:
+
+            type: string
+
+            example: 6907ece095bc7e2a3d62be46
+
+
+
+      responses:
+
+
+        '200':
+
+          description: Driver history retrieved successfully
+
+
+          content:
+
+            application/json:
+
+              schema:
+
+                type: object
+
+                properties:
+
+
+                  count:
+
+                    type: integer
+
+                    example: 12
+
+
+                  history:
+
+                    type: array
+
+
+                    items:
+
+                      $ref: '#/components/schemas/DriverHistory'
+
+
+
+        '401':
+
+          description: Unauthorized
+
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/ErrorResponse'
+
+
+
+        '404':
+
+          description: History not found
+
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/ErrorResponse'
+
+
+
+        '500':
+
+          description: Server error
+
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/ErrorResponse'
+
+
+  /admin/users/{id}:
+
+    get:
+
+      tags:
+        - Admin Account Management
+
+      summary: Get User profile
+
+      description: |
+        Retrieves user profile information including
+        verification status and uploaded documents.
+
+      security:
+        - bearerAuth: []
+
+      parameters:
+
+        - in: path
+          name: id
+          required: true
+
+          schema:
+            type: string
+
+
+      responses:
+
+        200:
+
+          description: User retrieved successfully
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/User'
+
+
+        404:
+
+          description: User not found
+
+
+  /admin/drivers/{id}:
+
+      get:
+
+        tags:
+          - Admin Account Management
+
+        summary: Get Driver profile
+
+        description: |
+          Retrieves driver profile information including
+          verification status and uploaded documents.
+
+        security:
+          - bearerAuth: []
+
+        parameters:
+
+          - in: path
+            name: id
+            required: true
+
+            schema:
+              type: string
+
+
+        responses:
+
+          200:
+
+            description: Driver retrieved successfully
+
+            content:
+
+              application/json:
+
+                schema:
+
+                  $ref: '#/components/schemas/Driver'
+
+
+          404:
+
+            description: Driver not found
+
+
+  /admin/delete-driver/{id}:
+    delete:
+      tags:
+        - Admin Account Management
+
+      summary: Delete a driver account
+
+      description: |
+        Allows an administrator to permanently remove a driver account.
+
+      security:
+        - bearerAuth: []
+
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: 68bfcb8fd2f97b3ac30ba278
+
+      responses:
+        200:
+          description: Driver deleted successfully
+
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+        403:
+          description: Forbidden - Admin access required
+
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+        404:
+          description: Driver not found
+
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+
+  /admin/delete-user/{id}:
+    delete:
+      tags:
+        - Admin Account Management
+
+      summary: Delete a user account
+
+      description: |
+        Allows an administrator to permanently remove a user account.
+
+      security:
+        - bearerAuth: []
+
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: 68bfcb8fd2f97b3ac30ba278
+
+      responses:
+        200:
+          description: User deleted successfully
+
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+        403:
+          description: Forbidden - Admin access required
+
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+        404:
+          description: User not found
+
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+
+  /users/register:
+
+    post:
+      tags:
+        - User Authentication
+
+      summary: Register a new user
+
+      description: |
+        Creates a new user account.
+        An OTP is generated and sent to the user's email
+        for account verification.
+
+      security: []
+
+      requestBody:
+        required: true
+
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+
+      responses:
+
+        201:
+          description: User registered successfully
+
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+        400:
+          description: Missing required fields
+
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+        409:
+          description: Email or phone number already exists
+
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+
+  /users/login:
+
+    post:
+      tags:
+        - User Authentication
+
+      summary: Login user
+
+      description: |
+        Authenticates a user and returns a JWT token.
+
+      security: []
+
+      requestBody:
+        required: true
+
+        content:
+
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+
+
+      responses:
+
+        200:
+          description: Login successful
+
+          content:
+            application/json:
+
+              schema:
+                type: object
+
+                properties:
+
+                  message:
+                    type: string
+                    example: Login successful
+
+                  token:
+                    type: string
+                    example: eyJhbGciOiJIUzI1Ni...
+
+
+        401:
+          description: Invalid credentials or unverified account
+
+          content:
+
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+
+  /users/verify-mail:
+
+    post:
+
+      tags:
+        - User Authentication
+
+      summary: Verify user email OTP
+
+      description: |
+        Confirms the OTP sent during registration.
+
+      security: []
+
+      requestBody:
+
+        required: true
+
+        content:
+
+          application/json:
+
+            schema:
+
+              type: object
+
+              required:
+                - email
+                - otp
+
+              properties:
+
+                email:
+
+                  type: string
+
+                  format: email
+
+                otp:
+
+                  type: string
+
+                  example: "123456"
+
+
+      responses:
+
+        200:
+
+          description: OTP verified successfully
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/SuccessResponse'
+
+
+        400:
+
+          description: Invalid or expired OTP
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/ErrorResponse'
+
+
+  /users/resend-otp:
+
+    post:
+
+      tags:
+
+        - User Authentication
+
+
+      summary: Resend verification OTP
+
+
+      security: []
+
+
+      requestBody:
+
+        required: true
+
+        content:
+
+          application/json:
+
+            schema:
+
+              type: object
+
+              required:
+
+                - email
+
+              properties:
+
+                email:
+
+                  type: string
+
+                  format: email
+
+
+      responses:
+
+        200:
+
+          description: OTP resent successfully
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/SuccessResponse'
+
+
+        404:
+
+          description: User not found
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/ErrorResponse'
+
+
+  /users/logout:
+
+    post:
+
+      tags:
+
+        - User Authentication
+
+
+      summary: Logout current user
+
+
+      description: |
+        Invalidates the current JWT token by adding it
+        to the token blacklist.
+
+
+      security:
+
+        - bearerAuth: []
+
+
+      responses:
+
+
+        200:
+
+          description: Logout successful
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/SuccessResponse'
+
+
+        401:
+
+          description: Missing or invalid token
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/ErrorResponse'
+
+
+  /users/change-password:
+
+
+    post:
+
+      tags:
+
+        - User Authentication
+
+
+      summary: Change password
+
+
+      description: |
+        Allows an authenticated user to change their password.
+
+
+      security:
+
+        - bearerAuth: []
+
+
+      requestBody:
+
+        required: true
+
+        content:
+
+          application/json:
+
+            schema:
+
+              type: object
+
+              required:
+
+                - oldPassword
+                - newPassword
+
+              properties:
+
+
+                oldPassword:
+
+                  type: string
+
+                  example: OldPassword123
+
+
+                newPassword:
+
+                  type: string
+
+                  example: NewPassword123
+
+
+
+      responses:
+
+
+        200:
+
+          description: Password changed successfully
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/SuccessResponse'
+
+
+        400:
+
+          description: Invalid old password
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/ErrorResponse'
+
+
+  /users/password-reset/request:
+
+
+    post:
+
+
+      tags:
+
+        - User Authentication
+
+
+      summary: Request password reset OTP
+
+
+      description: |
+        Sends a password reset OTP to the user's email.
+
+
+      security: []
+
+
+      requestBody:
+
+
+        required: true
+
+
+        content:
+
+
+          application/json:
+
+
+            schema:
+
+
+              type: object
+
+
+              required:
+
+                - email
+
+
+              properties:
+
+
+                email:
+
+                  type: string
+
+                  format: email
+
+
+
+
+      responses:
+
+
+        200:
+
+
+          description: Password reset OTP sent
+
+
+          content:
+
+
+            application/json:
+
+
+              schema:
+
+
+                $ref: '#/components/schemas/SuccessResponse'
+
+
+
+        404:
+
+
+          description: User not found
+
+
+          content:
+
+
+            application/json:
+
+
+              schema:
+
+
+                $ref: '#/components/schemas/ErrorResponse'
+
+
+  /users/password-reset/verify:
+
+
+    post:
+
+
+      tags:
+
+
+        - User Authentication
+
+
+      summary: Verify password reset OTP
+
+
+
+      security: []
+
+
+
+      requestBody:
+
+
+        required: true
+
+
+        content:
+
+
+          application/json:
+
+
+            schema:
+
+
+              type: object
+
+
+              required:
+
+
+                - email
+                - otp
+
+
+              properties:
+
+
+                email:
+
+
+                  type: string
+
+
+                  format: email
+
+
+                otp:
+
+
+                  type: string
+
+                  example: "123456"
+
+
+
+      responses:
+
+
+        200:
+
+
+          description: OTP verified successfully
+
+
+          content:
+
+
+            application/json:
+
+
+              schema:
+
+
+                $ref: '#/components/schemas/SuccessResponse'
+
+
+
+        400:
+
+
+          description: Invalid or expired OTP
+
+
+          content:
+
+
+            application/json:
+
+
+              schema:
+
+
+                $ref: '#/components/schemas/ErrorResponse'
+
+
+  /users/password-reset/resend:
+
+
+    post:
+
+
+      tags:
+
+
+        - User Authentication
+
+
+
+      summary: Resend password reset OTP
+
+
+
+      security: []
+
+
+
+      requestBody:
+
+
+        required: true
+
+
+        content:
+
+
+          application/json:
+
+
+            schema:
+
+
+              type: object
+
+
+              required:
+
+
+                - email
+
+
+              properties:
+
+
+                email:
+
+
+                  type: string
+
+
+                  format: email
+
+
+      responses:
+
+
+        200:
+
+          description: New OTP sent
+
+
+
+          content:
+
+
+            application/json:
+
+
+              schema:
+
+
+                $ref: '#/components/schemas/SuccessResponse'
+
+
+  /users/password-reset/reset:
+
+
+    post:
+
+
+      tags:
+
+
+        - User Authentication
+
+
+
+      summary: Reset password after OTP verification
+
+
+
+      security: []
+
+
+
+      requestBody:
+
+
+        required: true
+
+
+        content:
+
+
+          application/json:
+
+
+            schema:
+
+
+              type: object
+
+
+              required:
+
+
+                - email
+                - newPassword
+                - confirmPassword
+
+
+              properties:
+
+
+                email:
+
+
+                  type: string
+
+
+                  format: email
+
+
+                newPassword:
+
+
+                  type: string
+
+
+                  example: NewPassword123
+
+
+                confirmPassword:
+
+
+                  type: string
+
+
+                  example: NewPassword123
+
+
+
+
+      responses:
+
+
+        200:
+
+
+          description: Password reset successfully
+
+
+
+          content:
+
+
+            application/json:
+
+
+              schema:
+
+
+                $ref: '#/components/schemas/SuccessResponse'
+
+
+
+        403:
+
+
+          description: OTP verification required
+
+
+
+          content:
+
+
+            application/json:
+
+
+              schema:
+
+
+                $ref: '#/components/schemas/ErrorResponse'
+
+
+  /users/current:
+    get:
+      tags:
+        - User Profile
+
+      summary: Get current authenticated user
+
+      security:
+        - bearerAuth: []
+
+      responses:
+
+        200:
+          description: User profile retrieved successfully
+
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+
+        401:
+          description: Unauthorized
+
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    patch:
+
+      tags:
+        - User Profile
+
+      summary: Update user profile
+
+      description: |
+        Allows an authenticated user to update their own profile information.
+
+      security:
+        - bearerAuth: []
+
+      requestBody:
+
+        required: true
+
+        content:
+
+          application/json:
+
+            schema:
+              $ref: '#/components/schemas/UpdateUserRequest'
+
+      responses:
+
+        200:
+          description: User profile retrieved successfully
+
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+
+        401:
+          description: Unauthorized
+
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+
+  /users/child/:
+
+    post:
+
+      tags:
+        - Children Management
+
+      summary: Add a child
+
+      description: |
+        Creates a child profile linked to the authenticated user.
+        The user is taken from the authentication token.
+
+      security:
+        - bearerAuth: []
+
+      requestBody:
+
+        required: true
+
+        content:
+
+          multipart/form-data:
+
+            schema:
+
+              $ref: '#/components/schemas/CreateChildRequest'
+
+
+      responses:
+
+        201:
+
+          description: Child added successfully
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/Child'
+
+
+        400:
+
+          description: Invalid child information
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/ErrorResponse'
+
+
+        401:
+
+          description: Unauthorized
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/ErrorResponse'
+
+
+  /users/children/me:
+
+    get:
+
+      tags:
+        - Children Management
+
+      summary: Get authenticated user's children
+
+      description: |
+        Retrieves all children belonging to the authenticated user.
+
+      security:
+        - bearerAuth: []
+
+
+      responses:
+
+        200:
+
+          description: Children retrieved successfully
+
+          content:
+
+            application/json:
+
+              schema:
+
+                type: array
+
+                items:
+
+                  $ref: '#/components/schemas/Child'
+
+
+        401:
+
+          description: Unauthorized
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/ErrorResponse'
+
+
+  /users/child/{id}:
+
+    get:
+
+      tags:
+        - Children Management
+
+      summary: Get child details
+
+      description: |
+        Retrieves a specific child belonging to the authenticated user.
+
+      security:
+        - bearerAuth: []
+
+
+      parameters:
+
+        - name: id
+
+          in: path
+
+          required: true
+
+          schema:
+
+            type: string
+
+          example: 68bfcb8fd2f97b3ac30ba278
+
+
+      responses:
+
+        200:
+
+          description: Child retrieved successfully
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/Child'
+
+
+        404:
+
+          description: Child not found
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/ErrorResponse'
+
+
+
+
+    patch:
+
+      tags:
+        - Children Management
+
+      summary: Update child information
+
+      description: |
+        Updates a child profile belonging to the authenticated user.
+
+      security:
+        - bearerAuth: []
+
+
+      parameters:
+
+        - name: id
+
+          in: path
+
+          required: true
+
+          schema:
+
+            type: string
+
+
+      requestBody:
+
+        required: true
+
+        content:
+
+          multipart/form-data:
+
+            schema:
+
+              $ref: '#/components/schemas/UpdateChildRequest'
+
+
+      responses:
+
+        200:
+
+          description: Child updated successfully
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/Child'
+
+
+        401:
+
+          description: Unauthorized
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/ErrorResponse'
+
+
+
+
+    delete:
+
+      tags:
+        - Children Management
+
+      summary: Delete child profile
+
+      description: |
+        Removes a child profile belonging to the authenticated user.
+
+      security:
+        - bearerAuth: []
+
+
+      parameters:
+
+        - name: id
+
+          in: path
+
+          required: true
+
+          schema:
+
+            type: string
+
+
+      responses:
+
+        200:
+
+          description: Child deleted successfully
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/SuccessResponse'
+
+
+  /book/{childId}:
+
+    post:
+
+      tags:
+        - Ride Booking
+
+      summary: Book a ride for a child
+
+      description: |
+        Creates a new ride booking for the specified child.
+        The authenticated user must own the child profile.
+
+      security:
+        - bearerAuth: []
+
+      parameters:
+        - name: childId
+          in: path
+          required: true
+
+          schema:
+            type: string
+
+          example: 68bfcb8fd2f97b3ac30ba278
+
+      requestBody:
+
+        required: true
+
+        content:
+
+          application/json:
+
+            schema:
+              $ref: '#/components/schemas/CreateBookingRequest'
+
+      responses:
+
+        201:
+
+          description: Ride booked successfully
+
+          content:
+
+            application/json:
+
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Ride booked successfully, proceed to make payment
+
+                  booking:
+                    $ref: '#/components/schemas/Booking'
+
+        400:
+
+          description: Invalid booking details
+
+          content:
+
+            application/json:
+
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+        401:
+
+          description: Unauthorized
+
+          content:
+
+            application/json:
+
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+        404:
+
+          description: Child not found
+
+          content:
+
+            application/json:
+
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+
+  /book/edit/{rideId}:
+
+    patch:
+
+      tags:
+        - Ride Booking
+
+      summary: Edit an existing booking
+
+      description: |
+        Allows the booking owner to update a booking before payment.
+        Administrators can edit bookings regardless of status.
+
+      security:
+        - bearerAuth: []
+
+      parameters:
+        - name: rideId
+          in: path
+          required: true
+          schema:
+            type: string
+
+      requestBody:
+        required: true
+
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateBookingRequest'
+
+      responses:
+
+        200:
+          description: Booking updated successfully
+
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+
+        400:
+          description: Invalid request or booking cannot be edited
+
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+        403:
+          description: Unauthorized access
+
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+        404:
+          description: Booking not found
+
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+
+  /book/rides:
+
+    get:
+
+      tags:
+        - Ride Booking
+
+      summary: Get authenticated user's bookings
+
+      security:
+        - bearerAuth: []
+
+      responses:
+
+        200:
+          description: Bookings retrieved successfully
+
+          content:
+            application/json:
+
+              schema:
+
+                type: object
+
+                properties:
+
+                  rides:
+
+                    type: array
+
+                    items:
+                      $ref: '#/components/schemas/Booking'
+
+        401:
+          description: Unauthorized
+
+          content:
+            application/json:
+
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+
+  /book/ride/{childId}:
+
+    get:
+
+      tags:
+        - Ride Booking
+
+      summary: Get bookings for a child
+
+      security:
+        - bearerAuth: []
+
+      parameters:
+        - name: childId
+          in: path
+          required: true
+
+          schema:
+            type: string
+
+      responses:
+
+        200:
+          description: Bookings retrieved successfully
+
+          content:
+            application/json:
+
+              schema:
+
+                type: array
+
+                items:
+                  $ref: '#/components/schemas/Booking'
+
+        403:
+          description: Unauthorized child access
+
+          content:
+            application/json:
+
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+        404:
+          description: Child not found
+
+          content:
+            application/json:
+
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+
+  /book/all-rides:
+
+    get:
+
+      tags:
+        - Ride Booking
+
+      summary: Get all bookings
+
+      description: |
+        Currently available to authenticated users.
+        This endpoint will later be restricted to administrators.
+
+      security:
+        - bearerAuth: []
+
+      responses:
+
+        200:
+
+          description: All bookings retrieved successfully
+
+          content:
+
+            application/json:
+
+              schema:
+
+                type: object
+
+                properties:
+
+                  rides:
+
+                    type: array
+
+                    items:
+                      $ref: '#/components/schemas/Booking'
+
+        401:
+
+          description: Unauthorized
+
+          content:
+
+            application/json:
+
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+
+  /book/rides/recent/{childId}:
+
+    get:
+
+      tags:
+        - Ride Booking
+
+      summary: Get recent bookings for a child
+
+      security:
+        - bearerAuth: []
+
+      parameters:
+        - name: childId
+          in: path
+          required: true
+
+          schema:
+            type: string
+
+      responses:
+
+        200:
+
+          description: Recent bookings retrieved successfully
+
+          content:
+
+            application/json:
+
+              schema:
+
+                type: object
+
+                properties:
+
+                  bookings:
+
+                    type: array
+
+                    items:
+                      $ref: '#/components/schemas/Booking'
+
+        403:
+
+          description: Child does not belong to authenticated user
+
+          content:
+
+            application/json:
+
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+
+  /book/rides/status/{childId}/{status}:
+
+    get:
+
+      tags:
+        - Ride Booking
+
+      summary: Get bookings by status
+
+      security:
+        - bearerAuth: []
+
+      parameters:
+
+        - name: childId
+          in: path
+          required: true
+
+          schema:
+            type: string
+
+        - name: status
+          in: path
+          required: true
+
+          schema:
+            type: string
+            enum:
+              - booked
+              - paid
+              - assigned
+              - ongoing
+              - completed
+              - payment_failed
+              - cancelled
+              - expired
+
+      responses:
+
+        200:
+
+          description: Bookings retrieved successfully
+
+          content:
+
+            application/json:
+
+              schema:
+
+                type: object
+
+                properties:
+
+                  rides:
+
+                    type: array
+
+                    items:
+                      $ref: '#/components/schemas/Booking'
+
+        403:
+
+          description: Child does not belong to authenticated user
+
+          content:
+
+            application/json:
+
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+
+  /book/rides/make-payment:
+
+    post:
+
+      tags:
+        - Payments
+
+      summary: Create Stripe checkout session
+
+      description: |
+        Creates a Stripe Checkout session for an existing booking.
+        The booking must belong to the authenticated user and be eligible for payment.
+
+      security:
+        - bearerAuth: []
+
+      requestBody:
+
+        required: true
+
+        content:
+
+          application/json:
+
+            schema:
+
+              type: object
+
+              required:
+                - bookingId
+                - currency
+
+              properties:
+
+                bookingId:
+                  type: string
+                  example: 68bfcb8fd2f97b3ac30ba278
+
+                currency:
+                  type: string
+                  example: cad
+                  enum:
+                    - cad
+
+      responses:
+
+        200:
+
+          description: Checkout session created successfully
+
+          content:
+
+            application/json:
+
+              schema:
+
+                type: object
+
+                properties:
+
+                  message:
+                    type: string
+                    example: Checkout session created successfully
+
+                  url:
+                    type: string
+                    example: https://checkout.stripe.com/c/pay/cs_test_xxxxxxxxx
+
+        400:
+
+          description: Invalid request or booking not eligible for payment
+
+          content:
+
+            application/json:
+
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+        403:
+
+          description: Unauthorized access
+
+          content:
+
+            application/json:
+
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+        404:
+
+          description: Booking not found
+
+          content:
+
+            application/json:
+
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+
+  /book/rides/renew-payment:
+
+    post:
+
+      tags:
+        - Payments
+
+      summary: Renew an existing booking
+
+      description: |
+        Creates a Stripe Checkout session to renew an eligible booking.
+        Renewal is only allowed within three days of the booking's service end date.
+
+      security:
+        - bearerAuth: []
+
+      requestBody:
+
+        required: true
+
+        content:
+
+          application/json:
+
+            schema:
+
+              type: object
+
+              required:
+                - bookingId
+                - currency
+
+              properties:
+
+                bookingId:
+                  type: string
+                  example: 68bfcb8fd2f97b3ac30ba278
+
+                currency:
+                  type: string
+                  enum:
+                    - cad
+                  example: cad
+
+      responses:
+
+        200:
+
+          description: Renewal checkout session created successfully
+
+          content:
+
+            application/json:
+
+              schema:
+
+                type: object
+
+                properties:
+
+                  message:
+                    type: string
+                    example: Renewal checkout session created
+
+                  url:
+                    type: string
+                    example: https://checkout.stripe.com/c/pay/cs_test_xxxxxxxxx
+
+        400:
+
+          description: Booking is not eligible for renewal
+
+          content:
+
+            application/json:
+
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+        403:
+
+          description: Unauthorized access
+
+          content:
+
+            application/json:
+
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+        404:
+
+          description: Booking not found
+
+          content:
+
+            application/json:
+
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'               
+
+
+  /assignments/{id}:
+
+    get:
+
+      tags:
+        - Assignments
+
+      summary: Get assignment details
+
+      description: |
+        Retrieves a driver's assignment together with
+        the booking, child and parent information.
+
+      security:
+        - bearerAuth: []
+
+      parameters:
+
+        - in: path
+          name: id
+          required: true
+
+          schema:
+            type: string
+
+      responses:
+
+        200:
+          description: Assignment retrieved successfully
+
+          content:
+            application/json:
+
+              schema:
+                $ref: '#/components/schemas/Assignment'
+
+        404:
+          description: Assignment not found
+
+          content:
+            application/json:
+
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+
+  /assignments/{id}/accept:
+
+    patch:
+
+      tags:
+        - Assignments
+
+      summary: Accept assigned ride
+
+      security:
+        - bearerAuth: []
+
+      parameters:
+
+        - in: path
+          name: id
+          required: true
+
+          schema:
+            type: string
+
+      responses:
+
+        200:
+          description: Ride accepted successfully
+
+          content:
+            application/json:
+
+              schema:
+                $ref: '#/components/schemas/Assignment'
+
+        403:
+          description: Driver is not assigned to this ride
+
+        404:
+          description: Assignment not found
+
+
+  /assignments/{id}/reject:
+
+    patch:
+
+      tags:
+        - Assignments
+
+      summary: Reject assigned ride
+
+      security:
+        - bearerAuth: []
+
+      parameters:
+
+        - in: path
+          name: id
+          required: true
+
+          schema:
+            type: string
+
+      responses:
+
+        200:
+          description: Ride rejected successfully
+
+          content:
+            application/json:
+
+              schema:
+                $ref: '#/components/schemas/Assignment'
+
+
+  /assignments/{id}/start-pickup:
+
+    patch:
+
+      tags:
+        - Assignments
+
+      summary: Start travelling to pickup location
+
+      security:
+        - bearerAuth: []
+
+      parameters:
+
+        - in: path
+          name: id
+          required: true
+
+          schema:
+            type: string
+
+      responses:
+
+        200:
+          description: Driver started pickup journey
+
+          content:
+            application/json:
+
+              schema:
+                $ref: '#/components/schemas/Assignment'
+
+  
+  /assignments/{id}/pickup:
+
+    patch:
+
+      tags:
+        - Assignments
+
+      summary: Confirm child pickup
+
+      security:
+        - bearerAuth: []
+
+      parameters:
+
+        - in: path
+          name: id
+          required: true
+
+          schema:
+            type: string
+
+      responses:
+
+        200:
+          description: Child picked up successfully
+
+          content:
+            application/json:
+
+              schema:
+                $ref: '#/components/schemas/Assignment'
+
+
+  /assignments/{id}/start-dropoff:
+
+    patch:
+
+      tags:
+        - Assignments
+
+      summary: Start travelling to dropoff location
+
+      security:
+        - bearerAuth: []
+
+      parameters:
+
+        - in: path
+          name: id
+          required: true
+
+          schema:
+            type: string
+
+      responses:
+
+        200:
+          description: Driver started dropoff journey
+
+          content:
+            application/json:
+
+              schema:
+                $ref: '#/components/schemas/Assignment'
+
+
+  /assignments/{id}/complete:
+
+    patch:
+
+      tags:
+        - Assignments
+
+      summary: Complete assigned ride
+
+      security:
+        - bearerAuth: []
+
+      parameters:
+
+        - in: path
+          name: id
+          required: true
+
+          schema:
+            type: string
+
+      responses:
+
+        200:
+          description: Ride completed successfully
+
+          content:
+            application/json:
+
+              schema:
+                $ref: '#/components/schemas/Assignment'
+
+
+  /assignments/driver/active:
+
+    get:
+
+      tags:
+        - Assignments
+
+      summary: Get active assignments for current driver
+
+      description: |
+        Returns every assignment currently being worked on
+        by the authenticated driver.
+
+      security:
+        - bearerAuth: []
+
+      responses:
+        200:
+          description: Active assignments retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+
+                  assignments:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Assignment'
+
+  # DRIVER ENDPOINTS
+
+  /drivers/register:
+
+    post:
+
+      tags:
+        - Driver Authentication
+
+      summary: Register a new driver
+
+      requestBody:
+
+        required: true
+
+        content:
+
+          application/json:
+
+            schema:
+              $ref: '#/components/schemas/DriverRegisterRequest'
+
+      responses:
+
+        201:
+
+          description: Driver registered successfully
+
+          content:
+
+            application/json:
+
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+
+
+        400:
+
+          description: Missing required fields
+
+
+        409:
+
+          description: Email or phone number already exists
+
+
+  /drivers/login:
+
+    post:
+
+      tags:
+        - Driver Authentication
+
+      summary: Login driver
+
+      requestBody:
+
+        required: true
+
+        content:
+
+          application/json:
+
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+
+
+      responses:
+
+        200:
+
+          description: Login successful
+
+          content:
+
+            application/json:
+
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+
+
+  /drivers/logout:
+
+    post:
+
+      tags:
+        - Driver Authentication
+
+      summary: Logout driver
+
+      security:
+        - bearerAuth: []
+
+
+      responses:
+
+        200:
+
+          description: Logout successful
+
+          content:
+
+            application/json:
+
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+
+
+  /drivers/verify-mail:
+
+    post:
+
+      tags:
+        - Driver Authentication
+
+      summary: Verify driver email using OTP
+
+
+      requestBody:
+
+        required: true
+
+        content:
+
+          application/json:
+
+            schema:
+              $ref: '#/components/schemas/OTPRequest'
+
+
+      responses:
+
+        200:
+
+          description: Email verified successfully
+          
+
+  /drivers/resend-otp:
+
+    post:
+
+      tags:
+        - Driver Authentication
+
+      summary: Resend email verification OTP
+
+
+      requestBody:
+
+        required: true
+
+        content:
+
+          application/json:
+
+            schema:
+              $ref: '#/components/schemas/PasswordResetRequest'
+
+
+      responses:
+
+        200:
+
+          description: OTP resent successfully
+
+
+  /drivers/password-reset/request:
+
+    post:
+
+      tags:
+        - Driver Authentication
+
+      summary: Request password reset OTP
+
+
+      requestBody:
+
+        required: true
+
+        content:
+
+          application/json:
+
+            schema:
+              $ref: '#/components/schemas/PasswordResetRequest'
+
+
+      responses:
+
+        200:
+
+          description: Password reset OTP sent
+
+
+  /drivers/password-reset/resend:
+
+    post:
+
+      tags:
+        - Driver Authentication
+
+      summary: Resend password reset OTP
+
+
+      requestBody:
+
+        required: true
+
+        content:
+
+          application/json:
+
+            schema:
+              $ref: '#/components/schemas/PasswordResetRequest'
+
+
+      responses:
+
+        200:
+
+          description: OTP resent successfully
+
+
+  /drivers/password-reset/verify:
+
+    post:
+
+      tags:
+        - Driver Authentication
+
+      summary: Verify password reset OTP
+
+
+      requestBody:
+
+        required: true
+
+        content:
+
+          application/json:
+
+            schema:
+              $ref: '#/components/schemas/OTPRequest'
+
+
+      responses:
+
+        200:
+
+          description: OTP verified successfully
+
+
+  /drivers/password-reset/reset:
+
+    post:
+
+      tags:
+        - Driver Authentication
+
+      summary: Reset driver password
+
+
+      requestBody:
+
+        required: true
+
+        content:
+
+          application/json:
+
+            schema:
+              $ref: '#/components/schemas/PasswordResetConfirmRequest'
+
+
+      responses:
+
+        200:
+
+          description: Password reset successfully
+
+
+  /drivers/change-password:
+
+    post:
+
+      tags:
+        - Driver Authentication
+
+      summary: Change driver password
+
+
+      security:
+        - bearerAuth: []
+
+
+      requestBody:
+
+        required: true
+
+        content:
+
+          application/json:
+
+            schema:
+              $ref: '#/components/schemas/ChangePasswordRequest'
+
+
+      responses:
+
+        200:
+
+          description: Password changed successfully
+
+
+  /drivers/upload-details/{id}:
+
+    patch:
+
+      tags:
+        - Driver Documents
+
+      summary: Upload driver documents
+
+      description: |
+        Upload driver verification documents and profile image.
+
+      security:
+        - bearerAuth: []
+
+      parameters:
+
+        - in: path
+          name: id
+          required: true
+
+          schema:
+
+            type: string
+
+
+      requestBody:
+
+        required: true
+
+        content:
+
+          multipart/form-data:
+
+            schema:
+
+              $ref: '#/components/schemas/DriverUploadDetailsRequest'
+
+
+      responses:
+
+        200:
+
+          description: Driver documents uploaded successfully
+
+          content:
+
+            application/json:
+
+              schema:
+
+                type: object
+
+                properties:
+
+                  success:
+
+                    type: boolean
+
+
+                  message:
+
+                    type: string
+
+
+                  updatedDriver:
+
+                    $ref: '#/components/schemas/Driver'
+
+
+        400:
+
+          description: No file uploaded
+
+
+        404:
+
+          description: Driver not found
+
+
+  /drivers/me:
+
+    get:
+
+      tags:
+        - Driver Profile
+
+      summary: Get current authenticated driver
+
+      description: |
+        Retrieves the profile information of the currently authenticated driver.
+        The driver is identified from the JWT token.
+
+      security:
+        - bearerAuth: []
+
+      responses:
+
+        200:
+          description: Current driver retrieved successfully
+
+          content:
+            application/json:
+
+              schema:
+                type: object
+
+                properties:
+
+                  driver:
+                    $ref: '#/components/schemas/Driver'
+
+
+        401:
+          description: Unauthorized
+
+
+        404:
+          description: Driver not found
+
+
+        500:
+          description: Server error
+
+    patch:
+
+        tags:
+          - Driver Profile
+
+        summary: Update driver profile
+
+        description: |
+          Updates editable driver information.
+          Sensitive fields such as password,
+          approval status, verification status,
+          and account tokens cannot be updated here.
+
+        security:
+          - bearerAuth: []
+
+        requestBody:
+
+          required: true
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/UpdateDriverRequest'
+
+
+        responses:
+
+          200:
+
+            description: Driver updated successfully
+
+            content:
+
+              application/json:
+
+                schema:
+
+                  $ref: '#/components/schemas/Driver'
+
+
+          404:
+
+            description: Driver not found
+
+  /drivers/viewRides:
+
+    get:
+
+      tags:
+        - Driver Profile
+
+      summary: View driver's assigned rides
+
+      description: |
+        Retrieves rides assigned to the authenticated driver
+        including booking and child information.
+
+      security:
+        - bearerAuth: []
+
+      responses:
+
+        200:
+
+          description: Driver rides retrieved successfully
+
+          content:
+
+            application/json:
+
+              schema:
+
+                type: object
+
+                properties:
+
+                  driver:
+
+                    $ref: '#/components/schemas/Driver'
+
+
+                  rides:
+
+                    type: array
+
+                    items:
+
+                      type: object
+
+                      properties:
+
+                        assignmentId:
+
+                          type: string
+
+
+                        assignmentStatus:
+
+                          type: string
+
+
+                        booking:
+
+                          type: object
+
+
+        404:
+
+          description: Driver not found
+
+  /driver-shift/active:
+    get:
+      tags:
+        - Driver Shift
+
+      summary: View active driver shift
+
+      description: |
+        Returns the authenticated driver's currently active shift.
+        If no shift is active, the response returns `shift: null`.
+
+      security:
+        - bearerAuth: []
+
+      responses:
+        "200":
+          description: Active shift retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  shift:
+                      $ref: "#/components/schemas/DriverShift"
+                      nullable: true
+
+        "401":
+          description: Unauthorized
+
+        "500":
+          description: Server error
+
+  /driver-shift/end:
+    patch:
+      tags:
+        - Driver Shift
+
+      summary: End current driver shift
+
+      description: |
+        Ends the authenticated driver's active shift.
+
+        A shift cannot be ended while the driver still has active ride assignments.
+
+      security:
+        - bearerAuth: []
+
+      responses:
+        "200":
+          description: Shift completed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Shift completed
+
+                  shift:
+                    $ref: "#/components/schemas/DriverShift"
+
+        "400":
+          description: Cannot end shift or shift already processed
+
+        "401":
+          description: Unauthorized
+
+        "404":
+          description: No active shift found
+
+        "500":
+          description: Server error
+
+
+  /driver-history/me:
+    get:
+      tags:
+        - Driver History
+
+      summary: View my driving history
+
+      description: |
+        Returns all history records for the authenticated driver,
+        sorted from newest to oldest.
+
+      security:
+        - bearerAuth: []
+
+      responses:
+        "200":
+          description: Driver history retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+
+                  history:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/DriverHistory"
+
+        "401":
+          description: Unauthorized
+
+        "500":
+          description: Server error
+
+
+  /driver-history/period/{periodType}/{year}/{period}:
+    get:
+      tags:
+        - Driver History
+
+      summary: View history for a specific period
+
+      description: |
+        Returns the authenticated driver's history for a specific
+        day, week, month, or year.
+
+      security:
+        - bearerAuth: []
+
+      parameters:
+        - in: path
+          name: periodType
+          required: true
+          schema:
+            type: string
+            enum:
+              - day
+              - week
+              - month
+              - year
+
+        - in: path
+          name: year
+          required: true
+          schema:
+            type: integer
+            example: 2026
+
+        - in: path
+          name: period
+          required: true
+          schema:
+            type: integer
+            example: 7
+
+      responses:
+        "200":
+          description: History retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  history:
+                    $ref: "#/components/schemas/DriverHistory"
+
+        "401":
+          description: Unauthorized
+
+        "404":
+          description: History not found
+
+        "500":
+          description: Server error     
+
+
+
+
