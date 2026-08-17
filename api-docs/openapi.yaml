@@ -1017,89 +1017,57 @@ components:
 
 
     AdminDashboard:
-
       type: object
-
       properties:
-
         drivers:
-
           type: object
-
           properties:
-
             total:
               type: integer
-
             online:
               type: integer
-
             offline:
               type: integer
-
             activeShifts:
               type: integer
 
         rides:
-
           type: object
-
           properties:
-
             active:
               type: integer
-
             pending:
               type: integer
-
             completedToday:
               type: integer
 
-            cancelledToday:
-              type: integer
-
         bookings:
-
           type: object
-
           properties:
-
             paid:
               type: integer
-
             pendingPayment:
               type: integer
-
             expired:
               type: integer
-
             expiringSoon:
               type: integer
 
         users:
-
           type: object
-
           properties:
-
             parents:
               type: integer
-
             children:
               type: integer
 
     AdminUserDashboard:
-
       type: object
-
       properties:
 
         stats:
-
           type: object
-
           properties:
-
             totalUsers:
               type: integer
               example: 150
@@ -1120,16 +1088,14 @@ components:
               type: integer
               example: 45
 
-
         recentUsers:
-
           type: array
-
           items:
-
             type: object
-
             properties:
+              id:
+                type: string
+                example: "64f123456789abcdef123456"
 
               fullname:
                 type: string
@@ -1151,16 +1117,13 @@ components:
                 type: string
                 format: date-time
 
-
         usersWithChildren:
-
           type: array
-
           items:
-
             type: object
-
             properties:
+              id:
+                type: string
 
               fullname:
                 type: string
@@ -1168,38 +1131,83 @@ components:
               email:
                 type: string
 
+              phone_number:
+                type: string
+
               childrenCount:
                 type: integer
 
-
         recentBookings:
-
           type: array
-
           items:
-
             type: object
+            properties:
+              id:
+                type: string
+
+              status:
+                type: string
+
+              rideType:
+                type: string
+
+              tripType:
+                type: string
+
+              serviceStartDate:
+                type: string
+                format: date-time
+                nullable: true
+
+              serviceEndDate:
+                type: string
+                format: date-time
+                nullable: true
+
+              user:
+                type: object
+                nullable: true
+                properties:
+                  id:
+                    type: string
+                  fullname:
+                    type: string
+                  email:
+                    type: string
+                  phone_number:
+                    type: string
+
+              child:
+                type: object
+                nullable: true
+                properties:
+                  id:
+                    type: string
+                  fullname:
+                    type: string
+                  image:
+                    type: string
+                    nullable: true
+
+              createdAt:
+                type: string
+                format: date-time
 
 
     AdminDriverDashboard:
-
       type: object
-
       properties:
 
         stats:
-
           type: object
-
           properties:
-
             totalDrivers:
               type: integer
 
             approvedDrivers:
               type: integer
 
-            pendingDrivers:
+            unapprovedDrivers:
               type: integer
 
             onlineDrivers:
@@ -1208,161 +1216,581 @@ components:
             drivingDrivers:
               type: integer
 
-
         recentDrivers:
-
           type: array
-
           items:
-
             type: object
+            properties:
+              id:
+                type: string
 
+              fullname:
+                type: string
+
+              email:
+                type: string
+
+              phone_number:
+                type: string
+
+              image:
+                type: string
+                nullable: true
+
+              status:
+                type: string
+                enum:
+                  - driving
+                  - unavailable
+                  - online
+                  - offline
+
+              isApproved:
+                type: boolean
+
+              createdAt:
+                type: string
+                format: date-time
 
         activeShifts:
-
           type: array
-
           items:
-
             type: object
+            properties:
+              id:
+                type: string
 
+              date:
+                type: string
+                format: date-time
 
-        activeRides:
+              shift:
+                type: string
+                enum:
+                  - morning
+                  - afternoon
 
+              status:
+                type: string
+                enum:
+                  - active
+                  - completed
+                  - cancelled
+
+              startedAt:
+                type: string
+                format: date-time
+                nullable: true
+
+              assignmentCount:
+                type: integer
+
+              driver:
+                type: object
+                nullable: true
+                properties:
+                  id:
+                    type: string
+                  fullname:
+                    type: string
+                  phone_number:
+                    type: string
+                  image:
+                    type: string
+                    nullable: true
+                  status:
+                    type: string
+
+        activeAssignments:
           type: array
-
           items:
-
             type: object
+            properties:
+              id:
+                type: string
+
+              bookingId:
+                type: string
+                nullable: true
+
+              shift:
+                type: string
+                enum:
+                  - morning
+                  - afternoon
+
+              status:
+                type: string
+
+              createdAt:
+                type: string
+                format: date-time
+
+              driver:
+                type: object
+                nullable: true
+                properties:
+                  id:
+                    type: string
+                  fullname:
+                    type: string
+                  phone_number:
+                    type: string
+                  image:
+                    type: string
+                    nullable: true
+                  status:
+                    type: string
+
+              child:
+                type: object
+                nullable: true
+                properties:
+                  id:
+                    type: string
+                  fullname:
+                    type: string
+                  image:
+                    type: string
+                    nullable: true
+
+              parent:
+                type: object
+                nullable: true
+                properties:
+                  id:
+                    type: string
+                  fullname:
+                    type: string
+                  phone_number:
+                    type: string
+
+              serviceStartDate:
+                type: string
+                format: date-time
+                nullable: true
+
+              serviceEndDate:
+                type: string
+                format: date-time
+                nullable: true
+
 
     AdminBookingDashboard:
-
       type: object
-
       properties:
 
         stats:
-
           type: object
-
           properties:
-
             totalBookings:
               type: integer
 
             paidBookings:
               type: integer
 
-            assignedBookings:
-              type: integer
-
-            cancelledBookings:
+            pendingPayment:
               type: integer
 
             expiredBookings:
               type: integer
 
-            pendingPayment:
+            cancelledBookings:
               type: integer
 
+            unassignedPaidBookings:
+              type: integer
 
         unassignedBookings:
-
           type: array
-
           items:
-
             type: object
+            properties:
+              id:
+                type: string
 
+              status:
+                type: string
+
+              rideType:
+                type: string
+
+              tripType:
+                type: string
+
+              scheduleType:
+                type: string
+
+              startDate:
+                type: string
+                format: date-time
+                nullable: true
+
+              serviceStartDate:
+                type: string
+                format: date-time
+                nullable: true
+
+              serviceEndDate:
+                type: string
+                format: date-time
+                nullable: true
+
+              user:
+                type: object
+                nullable: true
+                properties:
+                  id:
+                    type: string
+                  fullname:
+                    type: string
+                  phone_number:
+                    type: string
+                  email:
+                    type: string
+
+              child:
+                type: object
+                nullable: true
+                properties:
+                  id:
+                    type: string
+                  fullname:
+                    type: string
+                  image:
+                    type: string
+                    nullable: true
+                  age:
+                    type: integer
+                  grade:
+                    type: string
+
+              createdAt:
+                type: string
+                format: date-time
 
         recentBookings:
-
           type: array
-
           items:
-
             type: object
+            properties:
+              id:
+                type: string
 
+              status:
+                type: string
+
+              rideType:
+                type: string
+
+              tripType:
+                type: string
+
+              scheduleType:
+                type: string
+
+              startDate:
+                type: string
+                format: date-time
+                nullable: true
+
+              serviceStartDate:
+                type: string
+                format: date-time
+                nullable: true
+
+              serviceEndDate:
+                type: string
+                format: date-time
+                nullable: true
+
+              user:
+                type: object
+                nullable: true
+                properties:
+                  id:
+                    type: string
+                  fullname:
+                    type: string
+                  phone_number:
+                    type: string
+                  email:
+                    type: string
+
+              child:
+                type: object
+                nullable: true
+                properties:
+                  id:
+                    type: string
+                  fullname:
+                    type: string
+                  image:
+                    type: string
+                    nullable: true
+                  age:
+                    type: integer
+                  grade:
+                    type: string
+
+              createdAt:
+                type: string
+                format: date-time
 
         activeBookings:
-
           type: array
-
           items:
-
             type: object
+            properties:
+              id:
+                type: string
 
+              status:
+                type: string
 
-        upcomingAssignments:
+              rideType:
+                type: string
 
-          type: array
+              tripType:
+                type: string
 
-          items:
+              scheduleType:
+                type: string
 
-            type: object
+              startDate:
+                type: string
+                format: date-time
+                nullable: true
+
+              serviceStartDate:
+                type: string
+                format: date-time
+                nullable: true
+
+              serviceEndDate:
+                type: string
+                format: date-time
+                nullable: true
+
+              user:
+                type: object
+                nullable: true
+                properties:
+                  id:
+                    type: string
+                  fullname:
+                    type: string
+                  phone_number:
+                    type: string
+
+              child:
+                type: object
+                nullable: true
+                properties:
+                  id:
+                    type: string
+                  fullname:
+                    type: string
+                  image:
+                    type: string
+                    nullable: true
+
+              createdAt:
+                type: string
+                format: date-time
+
 
     AdminRideDashboard:
-
       type: object
-
       properties:
 
         stats:
-
           type: object
-
           properties:
-
             ridesToday:
               type: integer
 
-            completedRides:
+            completedRidesToday:
               type: integer
 
             activeRides:
               type: integer
 
-            cancelledRides:
-              type: integer
-
             pendingRides:
               type: integer
 
-
         currentRides:
-
           type: array
-
           items:
-
             type: object
+            properties:
+              id:
+                type: string
 
+              bookingId:
+                type: string
+                nullable: true
+
+              assignmentId:
+                type: string
+                nullable: true
+
+              serviceDate:
+                type: string
+                format: date-time
+
+              status:
+                type: string
+                enum:
+                  - pending
+                  - enroute_pickup
+                  - picked_up
+                  - completed
+                  - cancelled
+
+              lastLocation:
+                type: object
+                nullable: true
+                properties:
+                  lat:
+                    type: number
+                  lng:
+                    type: number
+                  timestamp:
+                    type: string
+                    format: date-time
+                    nullable: true
+
+              driver:
+                type: object
+                nullable: true
+                properties:
+                  id:
+                    type: string
+                  fullname:
+                    type: string
+                  phone_number:
+                    type: string
+                  image:
+                    type: string
+                    nullable: true
+
+              child:
+                type: object
+                nullable: true
+                properties:
+                  id:
+                    type: string
+                  fullname:
+                    type: string
+                  image:
+                    type: string
+                    nullable: true
+
+              parent:
+                type: object
+                nullable: true
+                properties:
+                  id:
+                    type: string
+                  fullname:
+                    type: string
+                  phone_number:
+                    type: string
+
+              rideType:
+                type: string
+                nullable: true
+
+              tripType:
+                type: string
+                nullable: true
+
+              createdAt:
+                type: string
+                format: date-time
+
+              updatedAt:
+                type: string
+                format: date-time
 
         recentCompleted:
-
           type: array
-
           items:
-
             type: object
+            properties:
+              id:
+                type: string
 
+              bookingId:
+                type: string
+                nullable: true
 
-        activeDrivers:
+              assignmentId:
+                type: string
+                nullable: true
 
-          type: array
+              serviceDate:
+                type: string
+                format: date-time
 
-          items:
+              status:
+                type: string
+                enum:
+                  - completed
 
-            type: object
+              driver:
+                type: object
+                nullable: true
+                properties:
+                  id:
+                    type: string
+                  fullname:
+                    type: string
+                  image:
+                    type: string
+                    nullable: true
+                  phone_number:
+                    type: string
 
+              child:
+                type: object
+                nullable: true
+                properties:
+                  id:
+                    type: string
+                  fullname:
+                    type: string
+                  image:
+                    type: string
+                    nullable: true
 
-        waitingAssignments:
+              parent:
+                type: object
+                nullable: true
+                properties:
+                  id:
+                    type: string
+                  fullname:
+                    type: string
+                  phone_number:
+                    type: string
 
-          type: array
+              rideType:
+                type: string
+                nullable: true
 
-          items:
+              tripType:
+                type: string
+                nullable: true
 
-            type: object
+              createdAt:
+                type: string
+                format: date-time
+
+              completedAt:
+                type: string
+                format: date-time
 
 
     User:
@@ -3649,25 +4077,6 @@ paths:
 
 
                 $ref: '#/components/schemas/SuccessResponse'
-
-
-
-        404:
-
-
-          description: User not found
-
-
-          content:
-
-
-            application/json:
-
-
-              schema:
-
-
-                $ref: '#/components/schemas/ErrorResponse'
 
 
   /users/password-reset/verify:

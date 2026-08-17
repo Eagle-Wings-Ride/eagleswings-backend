@@ -120,7 +120,14 @@ const assignDriverToRide = async (req, res) => {
 
     return res.status(200).json({
       message: "Driver assignment created (pending driver response)",
-      assignment,
+      assignment: {
+        id: assignment._id,
+        driverId: driver._id,
+        driverName: `${driver.fullname}`,
+        shift: assignment.shift,
+        status: assignment.status,
+        bookingId: bookingId,
+      },
     });
   } catch (error) {
     console.error("Error assigning driver:", error);
@@ -166,7 +173,11 @@ const UnassignDriverFromRide = async (req, res) => {
 
     return res.status(200).json({
       message: "Driver unassigned successfully",
-      removedAssignment: assignment,
+      assignment: {
+        bookingId: bookingId,
+        driverId: driverId,
+        shift: assignment.shift,
+      },
     });
   } catch (error) {
     console.error("Error unassigning driver:", error);
