@@ -43,9 +43,33 @@ const notifyRideAssigned = async (assignment) => {
 /**
  * DRIVER ACCEPTED
  *
+ * Parent notification
+ */
+const notifyParentRideAccepted = async (assignment) => {
+  try {
+    const tokens = assignment.booking?.user?.fcmTokens;
+
+    if (!tokens?.length) return;
+
+    await sendToTokens(
+      tokens,
+      "Ride Accepted",
+      `Your driver has accepted the ride for ${assignment.booking.child.fullname}.`,
+      {
+        assignmentId: assignment._id.toString(),
+      },
+    );
+  } catch (err) {
+    console.error("notifyParentRideAccepted:", err);
+  }
+};
+
+/**
+ * DRIVER ACCEPTED
+ *
  * Admin notification
  */
-const notifyRideAccepted = async (assignment) => {
+const notifyAdminRideAccepted = async (assignment) => {
   try {
     const tokens = await getAdminTokens();
 
@@ -54,20 +78,22 @@ const notifyRideAccepted = async (assignment) => {
     await sendToTokens(
       tokens,
       "Ride Accepted",
-      "Driver accepted assigned ride",
+      "Driver accepted assigned ride.",
       {
         assignmentId: assignment._id.toString(),
       },
     );
   } catch (err) {
-    console.error("notifyRideAccepted:", err);
+    console.error("notifyAdminRideAccepted:", err);
   }
 };
 
 /**
  * DRIVER REJECTED
+ *
+ * Admin notification
  */
-const notifyRideRejected = async (assignment) => {
+const notifyAdminRideRejected = async (assignment) => {
   try {
     const tokens = await getAdminTokens();
 
@@ -76,18 +102,18 @@ const notifyRideRejected = async (assignment) => {
     await sendToTokens(
       tokens,
       "Ride Rejected",
-      "Driver rejected assigned ride",
+      "Driver rejected assigned ride.",
       {
         assignmentId: assignment._id.toString(),
       },
     );
   } catch (err) {
-    console.error("notifyRideRejected:", err);
+    console.error("notifyAdminRideRejected:", err);
   }
 };
 
 /**
- * Driver approaching pickup
+ * DRIVER APPROACHING PICKUP
  */
 const notifyDriverNearby = async (assignment, etaMinutes) => {
   try {
@@ -109,7 +135,7 @@ const notifyDriverNearby = async (assignment, etaMinutes) => {
 };
 
 /**
- * Driver arrived pickup
+ * DRIVER ARRIVED AT PICKUP
  */
 const notifyDriverArrivedPickup = async (assignment) => {
   try {
@@ -120,7 +146,7 @@ const notifyDriverArrivedPickup = async (assignment) => {
     await sendToTokens(
       tokens,
       "Driver Arrived",
-      `${assignment.booking.child.fullname} pickup driver has arrived`,
+      `${assignment.booking.child.fullname}'s pickup driver has arrived.`,
       {
         assignmentId: assignment._id.toString(),
       },
@@ -131,9 +157,11 @@ const notifyDriverArrivedPickup = async (assignment) => {
 };
 
 /**
- * Child picked up
+ * CHILD PICKED UP
+ *
+ * Parent notification
  */
-const notifyChildPickedUp = async (assignment) => {
+const notifyParentPickup = async (assignment) => {
   try {
     const tokens = assignment.booking?.user?.fcmTokens;
 
@@ -142,20 +170,22 @@ const notifyChildPickedUp = async (assignment) => {
     await sendToTokens(
       tokens,
       "Trip Started",
-      `${assignment.booking.child.fullname} is now travelling`,
+      `${assignment.booking.child.fullname} has been picked up and is now travelling.`,
       {
         assignmentId: assignment._id.toString(),
       },
     );
   } catch (err) {
-    console.error("notifyChildPickedUp:", err);
+    console.error("notifyParentPickup:", err);
   }
 };
 
 /**
- * Child dropped off
+ * CHILD DROPPED OFF
+ *
+ * Parent notification
  */
-const notifyDropoff = async (assignment) => {
+const notifyParentDropoff = async (assignment) => {
   try {
     const tokens = assignment.booking?.user?.fcmTokens;
 
@@ -164,22 +194,26 @@ const notifyDropoff = async (assignment) => {
     await sendToTokens(
       tokens,
       "Trip Completed",
-      `${assignment.booking.child.fullname} arrived safely`,
+      `${assignment.booking.child.fullname} has arrived safely.`,
       {
         assignmentId: assignment._id.toString(),
       },
     );
   } catch (err) {
-    console.error("notifyDropoff:", err);
+    console.error("notifyParentDropoff:", err);
   }
 };
 
 module.exports = {
   notifyRideAssigned,
-  notifyRideAccepted,
-  notifyRideRejected,
+
+  notifyParentRideAccepted,
+  notifyAdminRideAccepted,
+  notifyAdminRideRejected,
+
   notifyDriverNearby,
   notifyDriverArrivedPickup,
-  notifyChildPickedUp,
-  notifyDropoff,
+
+  notifyParentPickup,
+  notifyParentDropoff,
 };

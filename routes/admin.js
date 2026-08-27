@@ -7,6 +7,7 @@ const {registerAdmin, loginAdmin, verifyAdminOTP, resendAdminOTP} = require('../
 const {approveDriver, assignDriverToRide, UnassignDriverFromRide} = require('../controllers/adminCtrl')
 const {getDriver, getAllDrivers} = require('../controllers/driverCtrl')
 const {getUser, getAllUsers} = require('../controllers/userCtrl')
+const {getBookingById} = require('../controllers/bookCtrl')
 const { getDriverHistory} = require("../controllers/driverHistoryCtrl");
 const {adminDeleteUser, adminDeleteDriver} = require('../controllers/auth/adminAuthCtrl') 
 
@@ -29,6 +30,7 @@ router.route("/all-users").get(authenticateToken, getAllUsers);
 router.route("/all-drivers").get(authenticateToken, getAllDrivers);
 router.route("/users/:id").get(authenticateToken, getUser)
 router.route('/drivers/:id').get(authenticateToken, getDriver)
+router.route('/bookings/:id').get(authenticateToken, getBookingById)
 
 //Delete Accounts (User & Driver)
 router.route('/delete-driver/:id').delete(authenticateToken, adminDeleteDriver)

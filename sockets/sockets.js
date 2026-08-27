@@ -6,10 +6,11 @@ const Assignment = require("../models/Assignment");
 const socketAuth = require("../middleware/socketAuth");
 
 const { getDistance, estimateETA } = require("../utils/geo");
+const getRouteETA = require("../utils/googleRoutes");
 
 const {
-  notifyParentDriverNearby,
-  notifyParentDriverArrived,
+  notifyDriverNearby,
+  notifyDriverArrivedPickup,
 } = require("../utils/helpers/notifications.helpers");
 
 const {
@@ -19,6 +20,8 @@ const {
 } = require("../utils/helpers/ride.helpers");
 
 const LOCATION_THROTTLE_MS = 2000;
+
+const ETA_REFRESH_MS = 30000;
 
 const ARRIVAL_RADIUS = 200;
 
@@ -101,6 +104,8 @@ const setupSockets = (server) => {
     // ---------------- DRIVER LOCATION ----------------
 
     let lastLocationUpdate = 0;
+    // Keeps track of the last Google ETA calculated for each assignment.
+    const etaCache = new Map();
 
     socket.on("driver-location", async ({ lat, lng }) => {
       if (role !== "driver") return;
@@ -117,9 +122,9 @@ const setupSockets = (server) => {
         return;
       }
 
-
       const now = Date.now();
 
+      // Prevent excessive GPS/database processing.
       if (now - lastLocationUpdate < LOCATION_THROTTLE_MS) return;
 
       lastLocationUpdate = now;
@@ -172,9 +177,48 @@ const setupSockets = (server) => {
             ? assignment.booking.start_longitude
             : assignment.booking.end_longitude;
 
-          const distance = getDistance(lat, lng, targetLat, targetLng);
+           // Local straight-line distance.
+          // This is intentionally kept for reliable proximity/arrival checks.
+          const distance = getDistance(
+            lat,
+            lng,
+            targetLat,
+            targetLng
+          );
 
-          const eta = estimateETA(distance);
+          const assignmentId = assignment._id.toString();
+          const cachedETA = etaCache.get(assignmentId);
+
+          let eta;
+          let routeDistance = distance;
+          const currentTime = Date.now();
+
+          // Google provides the preferred road distance and
+          // traffic-aware ETA. If Google fails, the local
+          // distance and estimated ETA remain available.
+          if (!cachedETA || currentTime - cachedETA.timestamp >= ETA_REFRESH_MS) {
+            const route = await getRouteETA(
+              { lat, lng },
+              { lat: targetLat, lng: targetLng },
+            );
+
+            if (route?.durationSeconds) {
+              eta = Math.max(1, Math.round(route.durationSeconds / 60));
+
+              if (typeof route.distanceMeters === "number") {
+                routeDistance = route.distanceMeters;
+              }
+            } else {
+              eta = estimateETA(distance);
+            }
+
+            etaCache.set(assignmentId, {
+              etaMinutes: eta,
+              timestamp: currentTime,
+            });
+          } else {
+            eta = cachedETA.etaMinutes;
+          }
 
           // SAVE LIVE LOCATION
 
@@ -186,7 +230,10 @@ const setupSockets = (server) => {
             timestamp: new Date(),
           };
 
-          updateAssignmentDistance(assignment, distance);
+
+          // Save Google road distance when available.
+          // Falls back to local distance if Google fails.
+          updateAssignmentDistance(assignment, routeDistance);
 
           // SEND LIVE UPDATE
 
@@ -197,7 +244,7 @@ const setupSockets = (server) => {
 
             lng,
 
-            distanceMeters: Math.round(distance),
+            distanceMeters: Math.round(routeDistance),
 
             etaMinutes: eta,
 
@@ -207,7 +254,7 @@ const setupSockets = (server) => {
           // DRIVER NEARBY
 
           if (distance <= WARNING_RADIUS && !assignment.nearbyNotified) {
-            await notifyParentDriverNearby(assignment, eta);
+            await notifyDriverNearby(assignment, eta);
 
             assignment.nearbyNotified = true;
           }
@@ -221,7 +268,7 @@ const setupSockets = (server) => {
             await updateStatus(assignment, "arrived_pickup");
 
             if (!assignment.pickupNotified) {
-              await notifyParentDriverArrived(assignment);
+              await notifyDriverArrivedPickup(assignment);
 
               assignment.pickupNotified = true;
             }
@@ -247,9 +294,7 @@ const setupSockets = (server) => {
     // ---------------- DISCONNECT ----------------
 
     socket.on("disconnect", async () => {
-      console.log(
-          `[Socket Disconnected] ${role} ${id}`
-        );
+      console.log(`[Socket Disconnected] ${role} ${id}`);
 
       if (role === "driver") {
         await Driver.findByIdAndUpdate(id, {
