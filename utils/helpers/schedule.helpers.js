@@ -2,11 +2,11 @@
  * Booking schedule calculations
  */
 
-const {DaysOfWeek} = require("../bookingEnum")
+const { DaysOfWeek } = require("../bookingEnum");
 
 const addDays = (date, days) => {
   const d = new Date(date);
-  d.setHours(0,0,0,0);
+  d.setHours(0, 0, 0, 0);
   d.setDate(d.getDate() + days);
   return d;
 };
@@ -22,9 +22,8 @@ const WEEK_DAYS = [
 ];
 
 const getSelectedWeekdays = (pickupDays = []) => {
-  return pickupDays.map(day => WEEK_DAYS.indexOf(day));
+  return pickupDays.map((day) => WEEK_DAYS.indexOf(day));
 };
-
 
 /**
  * Counts service days only.
@@ -45,7 +44,7 @@ const addServiceDays = (startDate, serviceDays, pickupDays = []) => {
   }
 
   let current = new Date(startDate);
-  current.setHours(0,0,0,0);
+  current.setHours(0, 0, 0, 0);
 
   let completed = 0;
 
@@ -54,6 +53,9 @@ const addServiceDays = (startDate, serviceDays, pickupDays = []) => {
       completed++;
 
       if (completed === serviceDays) {
+        // The final service day has ended.
+        // Expiration begins at the start of the following day.
+        current = addDays(current, 1);
         break;
       }
     }
@@ -97,17 +99,13 @@ const calculateServiceDays = (booking) => {
 /**
  * Counts scheduled ride days between two dates (inclusive).
  */
-const countRideDaysBetween = (
-  startDate,
-  endDate,
-  pickupDays = []
-) => {
+const countRideDaysBetween = (startDate, endDate, pickupDays = []) => {
   const selected = getSelectedWeekdays(pickupDays);
 
   let count = 0;
 
   let current = new Date(startDate);
-  current.setHours(0,0,0,0);
+  current.setHours(0, 0, 0, 0);
 
   while (current <= endDate) {
     if (selected.includes(current.getDay())) {
@@ -132,11 +130,7 @@ const countRideDaysBetween = (
 const calculateServiceDates = (booking, startDate = booking.start_date) => {
   const serviceDays = calculateServiceDays(booking);
 
-  const endDate = addServiceDays(
-    startDate,
-    serviceDays,
-    booking.pickup_days
-  );
+  const endDate = addServiceDays(startDate, serviceDays, booking.pickup_days);
 
   return {
     serviceDays,
@@ -178,7 +172,7 @@ const remainingServiceDays = (booking) => {
   return countRideDaysBetween(
     today,
     booking.serviceEndDate,
-    booking.pickup_days
+    booking.pickup_days,
   );
 };
 
@@ -206,33 +200,26 @@ const remainingServiceDays = (booking) => {
  */
 const getServiceDates = (booking) => {
   if (!booking.start_date || !booking.serviceEndDate) {
-    throw new Error(
-      "Booking start date and service end date are required"
-    );
+    throw new Error("Booking start date and service end date are required");
   }
 
-  const selected = getSelectedWeekdays(
-    booking.pickup_days
-  );
+  const selected = getSelectedWeekdays(booking.pickup_days);
 
   const dates = [];
 
   let current = new Date(booking.start_date);
-  current.setHours(0,0,0,0);
+  current.setHours(0, 0, 0, 0);
 
   const end = new Date(booking.serviceEndDate);
-  end.setHours(0,0,0,0);
-
+  end.setHours(0, 0, 0, 0);
 
   while (current <= end) {
-
     if (selected.includes(current.getDay())) {
       dates.push(new Date(current));
     }
 
     current = addDays(current, 1);
   }
-
 
   return dates;
 };
