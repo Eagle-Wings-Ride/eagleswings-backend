@@ -60,9 +60,11 @@ const bookRide = async (req, res) => {
 
     /** ---------------- DATE VALIDATION ---------------- */
     validateStartDate(start_date);
-    const parsedStartDate = new Date(start_date);
-    parsedStartDate.setHours(0, 0, 0, 0); // safe for plain date
 
+    const [year, month, day] = start_date.split("-").map(Number);
+
+    const parsedStartDate = new Date(Date.UTC(year, month - 1, day));
+ 
     /** ---------------- SCHEDULE LOGIC ---------------- */
     if (schedule_type === ScheduleType.CUSTOM) {
       validateCustomDays(number_of_days);
@@ -173,7 +175,7 @@ const bookRide = async (req, res) => {
         adminTokens,
         "New Booking Created",
         `A booking has been created for child ${child.name}. Awaiting payment.`,
-        { bookingId: booking._id.toString() }
+        { bookingId: booking._id.toString() },
       );
     }
 
@@ -319,7 +321,7 @@ const renewBooking = async (req, res) => {
 
     if (!amount || isNaN(amount)) {
       throw new Error(
-        "Booking amount is invalid, cannot create Stripe session"
+        "Booking amount is invalid, cannot create Stripe session",
       );
     }
 
@@ -370,7 +372,7 @@ const getRidesByUser = async (req, res) => {
     // Get rides
     const rides = await Book.find({ user: userId }).populate(
       "child",
-      "fullname image grade age trip_type school"
+      "fullname image grade age trip_type school",
     );
 
     // Fetch assignments for all rides
@@ -402,11 +404,11 @@ const getRideByChild = async (req, res) => {
   try {
     const bookings = await Book.find({ child: childId }).populate(
       "child",
-      "fullname image grade age trip_type school"
+      "fullname image grade age trip_type school",
     );
 
     const isChildOwnedByUser = bookings.every(
-      (b) => b.user.toString() === req.user.userId.toString()
+      (b) => b.user.toString() === req.user.userId.toString(),
     );
     if (!isChildOwnedByUser)
       return res
@@ -496,7 +498,7 @@ const getAllPaidUsers = async (req, res) => {
     // Get unique users (avoid duplicates if multiple bookings)
     const users = rides.map((r) => r.user);
     const uniqueUsers = Array.from(
-      new Set(users.map((u) => u._id.toString()))
+      new Set(users.map((u) => u._id.toString())),
     ).map((id) => users.find((u) => u._id.toString() === id));
 
     // Send response
