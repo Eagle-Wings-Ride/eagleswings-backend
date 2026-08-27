@@ -64,7 +64,7 @@ const bookRide = async (req, res) => {
     const [year, month, day] = start_date.split("-").map(Number);
 
     const parsedStartDate = new Date(Date.UTC(year, month - 1, day));
- 
+
     /** ---------------- SCHEDULE LOGIC ---------------- */
     if (schedule_type === ScheduleType.CUSTOM) {
       validateCustomDays(number_of_days);
@@ -397,6 +397,34 @@ const getRidesByUser = async (req, res) => {
   }
 };
 
+//get a booking by Id
+const getBookingById = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const booking = await Book.findById(id)
+      .select(
+        "ride_type trip_type schedule_type number_of_days pickup_days start_date morning_from morning_to morning_time morning_from_address morning_to_address afternoon_from afternoon_to afternoon_time afternoon_from_address afternoon_to_address start_latitude start_longitude end_latitude end_longitude status user child serviceStartDate serviceEndDate",
+      )
+      .populate("user", "fullname email phone_number")
+      .populate("child", "fullname image");
+
+    if (!booking) {
+      return res.status(404).json({
+        message: "Booking not found",
+      });
+    }
+
+    res.json({
+      booking,
+    });
+  } catch (err) {
+    res
+      .status(500)
+      .json({ message: "Error fetching booking", error: err.message });
+  }
+};
+
 // get all rides by children
 const getRideByChild = async (req, res) => {
   const { childId } = req.params;
@@ -702,6 +730,7 @@ const editRide = async (req, res) => {
     res.status(400).json({ message: error.message });
   }
 };
+
 /* Not needed for now, but can be used in the future if we want to allow admins to update ride status directly
 const updateRideStatus = async (req, res) => {
   try {
@@ -769,5 +798,6 @@ module.exports = {
   getAllRides,
   getAllPaidUsers,
   getRecentRides,
+  getBookingById,
   getRidesByStatus,
 };
