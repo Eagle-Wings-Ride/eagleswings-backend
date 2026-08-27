@@ -758,6 +758,119 @@ components:
           type: string
           format: date-time
 
+    AdminBooking:
+      type: object
+      properties:
+        _id:
+          type: string
+          example: 68bfcb8fd2f97b3ac30ba278
+
+        ride_type:
+          type: string
+          enum:
+            - freelance
+            - inhouse
+
+        trip_type:
+          type: string
+          enum:
+            - one-way
+            - return
+
+        schedule_type:
+          type: string
+          enum:
+            - custom
+            - 2 weeks
+            - 1 month
+
+        pickup_days:
+          type: array
+          items:
+            type: string
+
+        start_date:
+          type: string
+          format: date-time
+
+        morning_from:
+          type: string
+
+        morning_to:
+          type: string
+
+        morning_time:
+          type: string
+
+        morning_from_address:
+          type: string
+
+        morning_to_address:
+          type: string
+
+        afternoon_from:
+          type: string
+
+        afternoon_to:
+          type: string
+
+        afternoon_time:
+          type: string
+
+        afternoon_from_address:
+          type: string
+
+        afternoon_to_address:
+          type: string
+
+        start_latitude:
+          type: number
+
+        start_longitude:
+          type: number
+
+        end_latitude:
+          type: number
+
+        end_longitude:
+          type: number
+
+        status:
+          type: string
+
+        serviceStartDate:
+          type: string
+          format: date-time
+          nullable: true
+
+        serviceEndDate:
+          type: string
+          format: date-time
+          nullable: true
+
+        user:
+          type: object
+          properties:
+            _id:
+              type: string
+            fullname:
+              type: string
+            email:
+              type: string
+              format: email
+            phone_number:
+              type: string
+
+        child:
+          type: object
+          properties:
+            _id:
+              type: string
+            fullname:
+              type: string
+            image:
+              type: string
+
 
     DriverHistory:
       type: object
@@ -3523,6 +3636,51 @@ paths:
           404:
 
             description: Driver not found
+
+  /admin/bookings/{id}:
+
+    get:
+
+      tags:
+        - Admin Account Management
+
+      summary: Get booking by ID
+
+      description: |
+        Retrieves a booking by ID including
+        booking details, parent information,
+        child information, ride details, status,
+        and service dates.
+
+      security:
+        - bearerAuth: []
+
+      parameters:
+
+        - in: path
+          name: id
+          required: true
+
+          schema:
+            type: string
+
+      responses:
+
+        200:
+
+          description: Booking retrieved successfully
+
+          content:
+
+            application/json:
+
+              schema:
+
+                $ref: '#/components/schemas/AdminBooking'
+
+        404:
+
+          description: Booking not found
 
 
   /admin/delete-driver/{id}:
